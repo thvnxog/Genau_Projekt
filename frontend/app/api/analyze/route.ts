@@ -1,0 +1,46 @@
+// frontend/app/api/analyze/route.ts
+// ------------------------------------------------------------
+// Proxy endpoint:
+//   Browser -> Next.js (/api/analyze) -> Flask (BACKEND_URL/api/analyze)
+//
+// Vorteil: Kein CORS-Setup im Flask nötig.
+// ------------------------------------------------------------
+
+export const runtime = 'nodejs';
+
+export async function POST(req: Request) {
+  const backend = process.env.BACKEND_URL;
+  if (!backend) {
+    return new Response('BACKEND_URL fehlt in .env.local', { status: 500 });
+  }
+
+  const incoming = await req.formData();
+  const file = incoming.get('file');
+
+  if (!file || !(file instanceof File)) {
+    return new Response("Kein Upload unter 'file' gefunden.", { status: 400 });
+  }
+
+  // Wir bauen neues FormData und schicken es an Flask weiter
+  const fd = new FormData();
+  fd.append('file', file, file.name);
+
+  // Falls dein Flask Endpoint noch zusätzliche Felder erwartet (optional),
+  // kannst du sie hier weiterreichen:
+  // const diet = incoming.get('diet');
+  // if (typeof diet === 'string') fd.append('diet', diet);
+
+  const res = await fetch(`${backend}/api/analyze`, {
+    method: 'POST',
+    body: fd,
+  });
+
+  const text = await res.text();
+
+  return new Response(text, {
+    status: res.status,
+    headers: {
+      'Content-Type': res.headers.get('content-type') ?? 'application/json',
+    },
+  });
+}

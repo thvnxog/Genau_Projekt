@@ -1,0 +1,107 @@
+{
+  "schema_version": "1.0",
+  "scope": {
+    "meal_type": "lunch",
+    "time_window_days": 5
+  },
+  "diets": ["mixed", "ovo_lacto_vegetarian"],
+  "rules": [
+    {
+      "id": "LUNCH_GRAINS_DAILY",
+      "label": "Getreide/Getreideprodukte/Kartoffeln 1× täglich",
+      "diet": "all",
+      "target": { "count_by": "food_group", "value": "grains_potatoes" },
+      "operator": "min",
+      "threshold": 5,
+      "notes": "Über 5 Verpflegungstage insgesamt mindestens 5 Vorkommen."
+    },
+    {
+      "id": "LUNCH_WHOLEGRAIN_MIN_1",
+      "label": "Vollkorn mind. 1×",
+      "diet": "all",
+      "target": { "count_by": "tag", "value": "wholegrain" },
+      "operator": "min",
+      "threshold": 1
+    },
+    {
+      "id": "LUNCH_POTATO_PRODUCTS_MAX_1",
+      "label": "Kartoffelerzeugnisse max. 1×",
+      "diet": "all",
+      "target": { "count_by": "tag", "value": "potato_product" },
+      "operator": "max",
+      "threshold": 1
+    },
+    {
+      "id": "LUNCH_VEGETABLES_DAILY",
+      "label": "Gemüse/Salat 1× täglich",
+      "diet": "all",
+      "target": { "count_by": "food_group", "value": "vegetables" },
+      "operator": "min",
+      "threshold": 5
+    },
+    {
+      "id": "LUNCH_RAW_VEG_MIN_2",
+      "label": "Davon Rohkost mind. 2×",
+      "diet": "all",
+      "target": { "count_by": "tag", "value": "raw_veg" },
+      "operator": "min",
+      "threshold": 2
+    },
+    {
+      "id": "LUNCH_LEGUMES_MIN_1",
+      "label": "Hülsenfrüchte mind. 1×",
+      "diet": "all",
+      "target": { "count_by": "food_group", "value": "legumes" },
+      "operator": "min",
+      "threshold": 1
+    },
+    {
+      "id": "LUNCH_FRUIT_MIN_2",
+      "label": "Obst mind. 2×",
+      "diet": "all",
+      "target": { "count_by": "food_group", "value": "fruit" },
+      "operator": "min",
+      "threshold": 2
+    },
+    {
+      "id": "LUNCH_WHOLE_FRUIT_MIN_1",
+      "label": "Davon Stückobst mind. 1×",
+      "diet": "all",
+      "target": { "count_by": "tag", "value": "whole_fruit" },
+      "operator": "min",
+      "threshold": 1
+    },
+    {
+      "id": "LUNCH_DAIRY_MIN_2",
+      "label": "Milch/Milchprodukte mind. 2×",
+      "diet": "all",
+      "target": { "count_by": "food_group", "value": "dairy" },
+      "operator": "min",
+      "threshold": 2
+    },
+    {
+      "id": "LUNCH_MEAT_MAX_2",
+      "label": "Fleisch/Wurst max. 2× pro Woche",
+      "diet": "mixed",
+      "target": { "count_by": "food_group", "value": "meat" },
+      "operator": "max",
+      "threshold": 2
+    },
+    {
+      "id": "LUNCH_FISH_MAX_1",
+      "label": "Fisch max. 1× pro Woche",
+      "diet": "mixed",
+      "target": { "count_by": "food_group", "value": "fish" },
+      "operator": "max",
+      "threshold": 1
+    },
+    {
+      "id": "LUNCH_NO_MEAT_VEG",
+      "label": "Kein Fleisch/Fisch bei ovo-lacto-vegetarischer Kost",
+      "diet": "ovo_lacto_vegetarian",
+      "target": { "count_by": "food_group", "value": ["meat", "fish"] },
+      "operator": "equals",
+      "threshold": 0
+    }
+  ]
+}

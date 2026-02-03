@@ -1,0 +1,104 @@
+{
+  "schema_version": "1.0",
+  "mapping": [
+    {
+      "dge_food_group": "fruit",
+      "match": {
+        "contains_any": ["apfel", "birne", "banane", "beere", "orange", "traube"]
+      }
+    },
+    {
+      "dge_food_group": "vegetables",
+      "match": {
+        "contains_any": [
+          "gemüse",
+          "salat",
+          "karotte",
+          "karotten",
+          "möhre",
+          "möhren",
+          "brokkoli",
+          "gurke",
+          "tomate",
+          "paprika",
+          "romanesco",
+          "spinat"
+        ]
+      }
+    },
+    {
+      "dge_food_group": "legumes",
+      "match": {
+        "contains_any": ["linsen", "bohnen", "kichererbsen", "erbsen"]
+      }
+    },
+    {
+      "dge_food_group": "grains_potatoes",
+      "match": {
+        "contains_any": ["reis", "nudel", "brot", "hafer", "weizen", "kartoffel", "spaghetti"]
+      }
+    },
+    {
+      "dge_food_group": "dairy",
+      "match": {
+        "contains_any": ["milch", "joghurt", "quark", "käse", "mozzarella","pudding"]
+      }
+    },
+    {
+      "dge_food_group": "meat",
+      "match": {
+        "contains_any": [
+          "rind",
+          "schwein",
+          "geflügel",
+          "hähnchen",
+          "pute",
+          "wurst",
+          "hack",
+          "fleisch",
+          "bifteki"
+        ]
+      }
+    },
+    {
+      "dge_food_group": "fish",
+      "match": {
+        "contains_any": [
+          "lachs",
+          "seelachs",
+          "kabeljau",
+          "thunfisch",
+          "fischfilet",
+          "forelle",
+          "alaska seelachs"
+        ]
+      }
+    }
+  ],
+  "tags": [
+    {
+      "tag": "wholegrain",
+      "match": {
+        "contains_any": ["vollkorn", "haferflocken", "dinkelvollkorn", "saatenbrot"]
+      }
+    },
+    {
+      "tag": "raw_veg",
+      "match": {
+        "contains_any": ["rohkost", "salat", "gurke", "tomate", "möhrensticks", "sticks"]
+      }
+    },
+    {
+      "tag": "potato_product",
+      "match": {
+        "contains_any": ["pommes", "kroketten", "kartoffelpuffer"]
+      }
+    },
+    {
+      "tag": "whole_fruit",
+      "match": {
+        "contains_any": ["apfel", "birne", "banane", "orange"]
+      }
+    }
+  ]
+}

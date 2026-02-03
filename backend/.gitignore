@@ -1,0 +1,17 @@
+# Python stuff
+__pycache__/
+*.pyc
+
+# Virtual env
+venv/
+.venv/
+
+# Local data (Excel etc.)
+data/
+
+# Flask instance folder / DB
+instance/
+*.db
+
+# Env files
+.env
