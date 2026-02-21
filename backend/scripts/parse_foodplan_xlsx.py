@@ -193,4 +193,4 @@ if __name__ == "__main__":
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(plan, indent=2, ensure_ascii=False), encoding="utf-8")
 
-    print("✅ foodplan.json geschrieben:", out)
+    print(" foodplan.json geschrieben:", out)

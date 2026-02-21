@@ -116,6 +116,8 @@ export default function Page() {
   // Entfernt die ausgewählte Datei und leert zusätzlich den versteckten File-Input.
   function clearSelectedFile() {
     setFile(null);
+    setDual(null);
+    setError(null);
     if (fileInputRef.current) fileInputRef.current.value = '';
   }
 
@@ -150,7 +152,7 @@ export default function Page() {
       // kann man hier später fallbacken. Für jetzt: dual nötig.
       if (!data || data.mode !== 'dual') {
         throw new Error(
-          'Backend hat keinen dual-Report geliefert (erwarte mode="dual").'
+          'Backend hat keinen dual-Report geliefert (erwarte mode="dual").',
         );
       }
 
