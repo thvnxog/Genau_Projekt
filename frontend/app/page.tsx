@@ -258,8 +258,18 @@ export default function Page() {
       });
 
       if (!res.ok) {
+        const contentType = res.headers.get('content-type') ?? '';
         const msg = await res.text();
-        throw new Error(msg || `HTTP ${res.status}`);
+
+        // Flask kann bei abort(...) je nach Config/Debug ein HTML-Error-Document liefern.
+        // Dann zeigen wir eine saubere Standardmeldung.
+        const fallback =
+          'Datei ist ungültig. Bitte fülle das Template korrekt aus und lade die Datei erneut hoch.';
+
+        const isProbablyHtml = contentType.includes('text/html');
+        const finalMsg = !msg || isProbablyHtml ? fallback : msg;
+
+        throw new Error(finalMsg || `HTTP ${res.status}`);
       }
 
       const data = (await res.json()) as PreviewResponse;
@@ -374,7 +384,6 @@ export default function Page() {
   return (
     <main className='min-h-screen w-screen box-border bg-white p-6 text-center font-sans text-slate-900'>
       <h1 className='m-0 text-[28px] font-black'>GENAU – Speiseplan Check</h1>
-      <p className='mt-2 text-slate-600 opacity-80'>Upload Excel/JSON</p>
 
       <section className='mx-auto mt-5 grid w-full max-w-300 gap-3 rounded-xl border border-slate-200 bg-white p-4 text-slate-900'>
         {/* Step indicator + Navigation */}
@@ -548,7 +557,15 @@ export default function Page() {
             </div>
 
             <div className='text-left text-xs text-slate-600'>
-              Tipp: Danach klickst du auf <b>Weiter</b>.
+              Vorlage nötig?{' '}
+              <a
+                href='/Speiseplan_Template.xlsx'
+                download
+                className='font-bold text-slate-900 underline underline-offset-2'
+              >
+                Template herunterladen
+              </a>
+              .
             </div>
           </div>
         )}

@@ -175,6 +175,17 @@ def parse_foodplan_xlsx(xlsx_input: Union[Path, IO[bytes]]) -> dict:
             ]
         })
 
+    # Wenn gar keine Items extrahiert wurden, ist das XLSX-Format sehr wahrscheinlich falsch.
+    total_items = sum(
+        len(menu.get("items") or [])
+        for day in plan.get("days") or []
+        for menu in (day.get("menus") or [])
+    )
+    if total_items == 0:
+        raise RuntimeError(
+            "0 Items extrahiert. Vermutlich passt das XLSX nicht zum KW47-Template (Sheet 'Tabelle1', Spalten A..J)."
+        )
+
     return plan
 
 

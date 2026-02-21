@@ -186,7 +186,17 @@ def create_app():
 
         from scripts.parse_foodplan_xlsx import parse_foodplan_xlsx
 
-        plan = parse_foodplan_xlsx(bio)
+        try:
+            plan = parse_foodplan_xlsx(bio)
+        except Exception:
+            # Parser wirft z.B. RuntimeError bei 0 Items / falschem Template.
+            abort(
+                400,
+                description=(
+                    "Datei ist ungültig. Bitte füllen Sie das KW47-Template korrekt aus "
+                    "(Sheet 'Tabelle1', Spalten A..J) und laden Sie die Datei erneut hoch."
+                ),
+            )
 
         from scripts.enrich_foodplan import (
             load_keyword_files,
