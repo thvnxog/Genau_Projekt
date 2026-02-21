@@ -262,19 +262,22 @@ export default function Page() {
         const msg = await res.text();
 
         // Flask kann bei abort(...) (oder durch Proxy/Hard-Error) statt JSON/Text auch HTML liefern.
-        // Vorher haben wir dann IMMER eine generische Meldung angezeigt, was das Debugging schwer macht.
-        // Neues Verhalten:
-        // - Wenn wir einen sinnvollen Text bekommen: zeigen wir ihn.
-        // - Wenn es HTML/leer ist: zeigen wir eine kurze Standardmeldung + Debug-Details.
+        // Für Nutzer zeigen wir dann eine kurze Standardmeldung.
+        // Für Debugging loggen wir Details in die Konsole (statt sie im UI anzuzeigen).
         const fallback =
-          'Datei ist ungültig oder passt nicht zum Template. Bitte prüfe das Template und versuche es erneut.';
+          'Datei ist ungültig oder passt nicht zum Template.\n\nHäufige Ursachen:\n- falscher Tabellenblatt-Name (erwartet: "Tabelle1")\n- fehlende Wochentage in Spalte A (Montag–Freitag)\n- keine Gerichte in den vorgesehenen Spalten';
 
         const isProbablyHtml = contentType.includes('text/html');
 
-        const finalMsg =
-          msg && !isProbablyHtml
-            ? msg
-            : `${fallback}\n\n(Technische Details: HTTP ${res.status}, Content-Type: ${contentType || 'unbekannt'})`;
+        if (!msg || isProbablyHtml) {
+          console.error('Preview upload failed', {
+            status: res.status,
+            contentType,
+            bodySnippet: msg?.slice(0, 500) ?? '',
+          });
+        }
+
+        const finalMsg = msg && !isProbablyHtml ? msg : fallback;
 
         throw new Error(finalMsg || `HTTP ${res.status}`);
       }
