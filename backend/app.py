@@ -198,55 +198,59 @@ def create_app():
         upload_dir.mkdir(parents=True, exist_ok=True)
         saved_path = upload_dir / filename
         f.save(saved_path)
+        print("ANALYZE: saved", saved_path, "size:", saved_path.stat().st_size)
+        print("ANALYZE: start parse")
 
-        # 2) Dateityp-Check: derzeit nur JSON
-        if suffix != ".json":
-            abort(
-                400,
-                description=(
-                    "Für den Test akzeptieren wir erstmal nur .json (Excel kommt als nächstes)."
-                ),
-            )
 
-        # 3) JSON laden
-        try:
-            plan = json.loads(saved_path.read_text(encoding="utf-8"))
-        except Exception as e:
-            abort(400, description=f"Ungültiges JSON: {e}")
+        # 2) Dateityp-Check: ab jetzt nur XLSX (KW47-Template)
+        if suffix != ".xlsx":
+            abort(400, description="Bitte eine .xlsx Datei im KW47-Template hochladen.")
 
-        # 4) Normalisieren (siehe oben)
+        # 3) XLSX parsen -> foodplan.json-Format
+        from scripts.parse_foodplan_xlsx import parse_foodplan_xlsx
+        plan = parse_foodplan_xlsx(saved_path)
+
+
+        # 4) Enrichment: food_group + tags setzen
+        from scripts.enrich_foodplan import load_keyword_files, load_json_mapping, merge_keywords, enrich_plan
+
+        base_dir = Path(__file__).resolve().parent  # backend/
+        keywords_root = base_dir / "rules" / "keywords"
+        mapping_json = base_dir / "rules" / "bls_to_dge_groups.json"
+
+        group_txt = load_keyword_files(keywords_root / "groups")
+        tag_txt = load_keyword_files(keywords_root / "tags")
+        group_json, tag_json = load_json_mapping(mapping_json)
+
+        group_keywords = merge_keywords(group_txt, group_json)
+        tag_keywords = merge_keywords(tag_txt, tag_json)
+
+        plan, _stats = enrich_plan(plan, group_keywords, tag_keywords, bls_db_path=None)
+
+        # 5) Normalisieren (deine Datenhygiene)
         plan = normalize_plan(plan)
 
-        # 5) Regeln laden
-        # Achtung: relativer Pfad. Funktioniert zuverlässig, wenn man aus backend/ startet
-        # oder wenn das Working Directory korrekt ist.
-        rules_path = Path("rules/dge_lunch_rules.json")
+        # 6) Regeln laden (robust, relativ zu backend/)
+        rules_path = base_dir / "rules" / "dge_lunch_rules.json"
         if not rules_path.exists():
             abort(500, description="rules/dge_lunch_rules.json nicht gefunden (Pfad prüfen).")
-
         rules_doc = json.loads(rules_path.read_text(encoding="utf-8"))
 
-        # 6) Evaluation ausführen:
-        # Wir importieren hier den Script-Code.
-        # Stelle sicher, dass die Datei so liegt: backend/scripts/evaluate_foodplan.py
+        # 7) Evaluation (dual)
         from scripts.evaluate_foodplan import evaluate_plan_for_diet
 
-        # Dual-Report: wir berechnen 2 Varianten
         report = {
             "schema_version": "1.0",
             "mode": "dual",
             "mixed": evaluate_plan_for_diet(plan, rules_doc, "mixed"),
-            "ovo_lacto_vegetarian": evaluate_plan_for_diet(
-                plan, rules_doc, "ovo_lacto_vegetarian"
-            ),
-            # Debug-Infos helfen bei der Fehlersuche
+            "ovo_lacto_vegetarian": evaluate_plan_for_diet(plan, rules_doc, "ovo_lacto_vegetarian"),
             "debug": {
                 "saved_upload": str(saved_path),
                 "source_filename": filename,
             },
         }
-
         return report
+
 
     return app
 

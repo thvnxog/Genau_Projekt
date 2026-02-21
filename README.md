@@ -175,6 +175,28 @@ npm install
 npm run dev
 ```
 
+### Frontend-Konfiguration (`.env.local`)
+
+Für das Frontend wird eine lokale Env-Datei empfohlen:
+
+- Datei: `frontend/.env.local`
+- Zweck: enthält die URL/Adresse, unter der das Backend erreichbar ist (und ggf. weitere Frontend-Settings)
+
+**Wichtig:** `frontend/.env.local` ist in der Regel in `.gitignore` und wird **nicht** mit ins Repo committed.
+Das heißt: **Nach dem Klonen** muss jede\*r diese Datei lokal selbst anlegen.
+
+Minimal-Schritte:
+
+1. Datei erstellen: `frontend/.env.local`
+2. Variable setzen (Beispiel, Backend läuft lokal auf Port 5000):
+
+```env
+# URL zum Flask Backend (für API-Calls aus dem Frontend)
+BACKEND_URL=http://127.0.0.1:5000
+```
+
+> Hinweis: Variablen mit Prefix `NEXT_PUBLIC_` sind im Browser verfügbar. Nach Änderungen an `.env.local` den Dev-Server neu starten.
+
 Dann:
 
 - http://localhost:3000
@@ -235,11 +257,40 @@ Du verwendest sehr wahrscheinlich den falschen Python-Interpreter.
 
 Wenn `127.0.0.1:5000` belegt ist, stoppe den Prozess, der den Port nutzt, oder starte das Backend auf einem anderen Port (ggf. Code in `backend/app.py` anpassen).
 
+## `npm run dev` hängt bei "Starting..."
+
+Wenn der Next.js Dev-Server bei **"Starting..."** hängen bleibt, hilft in der Regel ein kompletter Clean-Reinstall (Cache + Dependencies neu aufsetzen):
+
+```sh
+cd frontend
+
+# Next Build-Cache + Dependencies entfernen
+rm -rf node_modules package-lock.json .next
+
+# Alles neu installieren
+npm install
+
+# Dev-Server starten
+npm run dev
+
+
 ## 10) Projekt-Dateien (Kurzüberblick)
 
 - `backend/app.py`: Flask-API (Routes)
 - `backend/models.py`: SQLAlchemy Modelle + `to_dict()`
 - `backend/import_bls.py`: Import aus Excel in SQLite
-- `backend/instance/bls.db`: SQLite Datenbankdatei
+- `backend/scripts/`: Hilfsskripte für Verarbeitung/Evaluation (siehe unten)
+  - `backend/scripts/enrich_foodplan.py`: reichert `foodplan.json` mit `links.food_group`, `tags` und Confidence an (Output: `foodplan.enriched.json`)
+  - `backend/scripts/evaluate_foodplan.py`: bewertet einen (enriched) Plan gegen `rules/dge_lunch_rules.json` und erzeugt einen Dual-Report (`report.dual.json`)
+- `backend/rules/`: Regel- und Mapping-Dateien (JSON) + Keyword-Listen
+  - `backend/rules/dge_lunch_rules.json`: Regeln für die DGE-Lunch-Auswertung
+  - `backend/rules/bls_to_dge_groups.json`: Mapping/Keywords zur Zuordnung BLS/Begriffe -> DGE-Food-Groups
+  - `backend/rules/keywords/`: Keyword-Dateien als `.txt`
+    - `backend/rules/keywords/groups/`: Keywords je Food-Group (z.B. `vegetable.txt`, `meat.txt`)
+    - `backend/rules/keywords/tags/`: Keywords je Tag (optional)
+- `backend/instance/bls.db`: SQLite Datenbankdatei (wird beim Import erzeugt)
+- `backend/instance/uploads/`: (optional) Debug-Uploads vom `/api/analyze` Endpoint
+- `backend/instance/testdata/`: Beispielpläne und Beispiel-Reports zum Testen
 - `data/`: Excel-Quelle
 - `frontend/`: Next.js Frontend
+```
