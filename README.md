@@ -289,7 +289,7 @@ npm run dev
     - `backend/rules/keywords/groups/`: Keywords je Food-Group (z.B. `vegetable.txt`, `meat.txt`)
     - `backend/rules/keywords/tags/`: Keywords je Tag (optional)
 - `backend/instance/bls.db`: SQLite Datenbankdatei (wird beim Import erzeugt)
-- `backend/instance/uploads/`: (optional) Debug-Uploads vom `/api/analyze` Endpoint
+- `backend/instance/uploads/`: optionaler Ordner (derzeit nicht genutzt) – Uploads werden in-memory verarbeitet und nicht auf Disk gespeichert
 - `backend/instance/testdata/`: Beispielpläne und Beispiel-Reports zum Testen
 - `data/`: Excel-Quelle
 - `frontend/`: Next.js Frontend

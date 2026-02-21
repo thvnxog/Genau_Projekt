@@ -28,9 +28,9 @@ type ReportDual = {
 type PlanItem = {
   raw_text?: string;
   links?: { food_group?: string | null };
-  // tags bewusst nicht mehr im Selbstcheck editierbar
+  // Tags sind im Selbstcheck editierbar (optional), weil sie Regel-Ausnahmen/Verfeinerungen abbilden.
   tags?: string[];
-  // Optional: Mehrfach-Zuordnung von Food-Groups (für Selbstcheck-UI)
+  // Optional: Mehrfach-Zuordnung von Food-Groups (für Selbstcheck-UI / Auswertung)
   food_groups?: string[];
 };
 
@@ -113,8 +113,9 @@ function toggleFoodGroup(
 }
 
 function getPrimaryFoodGroup(item: PlanItem): string {
-  // Für die Auswertung zählt aktuell `links.food_group` (ein Wert).
-  // Wir leiten ihn aus der Mehrfachauswahl ab (oder fallbacken auf das bestehende Feld).
+  // Legacy-Helfer fürs UI: liefert eine einzelne "Hauptgruppe" zum Anzeigen.
+  // Für die Auswertung werden alle Einträge in `item.food_groups[]` gezählt (falls vorhanden).
+  // Fallback bleibt `links.food_group`.
   const fromMulti = Array.isArray(item.food_groups)
     ? item.food_groups[0]
     : undefined;
@@ -314,39 +315,16 @@ export default function Page() {
     }
   }
 
-  // Backward compatibility: der alte Button ruft jetzt Selfcheck auf.
-  async function analyze() {
-    return startSelfCheck();
-  }
-
-  const draftDays = planDraft?.days ?? [];
-
   const draftItemCount = useMemo(() => {
+    const days = planDraft?.days ?? [];
     let n = 0;
-    for (const d of draftDays) {
+    for (const d of days) {
       for (const m of d.menus ?? []) {
         n += (m.items ?? []).length;
       }
     }
     return n;
-  }, [draftDays]);
-
-  function setItemFoodGroup(
-    dayIdx: number,
-    menuIdx: number,
-    itemIdx: number,
-    fg: string,
-  ) {
-    setPlanDraft((prev) => {
-      if (!prev) return prev;
-      const next = structuredClone(prev);
-      const item = next.days?.[dayIdx]?.menus?.[menuIdx]?.items?.[itemIdx];
-      if (!item) return prev;
-      item.links = item.links ?? {};
-      item.links.food_group = fg || null;
-      return next;
-    });
-  }
+  }, [planDraft]);
 
   function toggleItemFoodGroup(
     dayIdx: number,
@@ -786,17 +764,19 @@ export default function Page() {
                                     </div>
 
                                     <div className='mt-2 text-[11px] text-slate-500'>
-                                      Hauptgruppe (für Auswertung):{' '}
+                                      Gruppen (für Auswertung):{' '}
                                       <b>
                                         {(() => {
-                                          const pg = getPrimaryFoodGroup(it) as
-                                            | Exclude<FoodGroup, ''>
-                                            | '';
-                                          return pg
-                                            ? FOOD_GROUP_LABELS[
-                                                pg as Exclude<FoodGroup, ''>
-                                              ]
-                                            : '—';
+                                          const list = (it.food_groups ??
+                                            [it.links?.food_group].filter(
+                                              Boolean,
+                                            )) as Exclude<FoodGroup, ''>[];
+
+                                          if (!list.length) return '—';
+
+                                          return list
+                                            .map((g) => FOOD_GROUP_LABELS[g])
+                                            .join(' · ');
                                         })()}
                                       </b>
                                     </div>
