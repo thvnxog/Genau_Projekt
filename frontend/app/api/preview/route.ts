@@ -1,9 +1,7 @@
-// frontend/app/api/analyze/route.ts
+// frontend/app/api/preview/route.ts
 // ------------------------------------------------------------
 // Proxy endpoint:
-//   Browser -> Next.js (/api/analyze) -> Flask (BACKEND_URL/api/analyze)
-//
-// Vorteil: Kein CORS-Setup im Flask nötig.
+//   Browser -> Next.js (/api/preview) -> Flask (BACKEND_URL/api/preview)
 // ------------------------------------------------------------
 
 export const runtime = 'nodejs';
@@ -14,29 +12,6 @@ export async function POST(req: Request) {
     return new Response('BACKEND_URL fehlt in .env.local', { status: 500 });
   }
 
-  const ct = req.headers.get('content-type') ?? '';
-
-  // 1) JSON: { plan: ... }
-  if (ct.includes('application/json')) {
-    const body = await req.text();
-
-    const res = await fetch(`${backend}/api/analyze`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body,
-    });
-
-    const text = await res.text();
-
-    return new Response(text, {
-      status: res.status,
-      headers: {
-        'Content-Type': res.headers.get('content-type') ?? 'application/json',
-      },
-    });
-  }
-
-  // 2) multipart/form-data (Upload)
   const incoming = await req.formData();
   const file = incoming.get('file');
 
@@ -47,7 +22,7 @@ export async function POST(req: Request) {
   const fd = new FormData();
   fd.append('file', file, file.name);
 
-  const res = await fetch(`${backend}/api/analyze`, {
+  const res = await fetch(`${backend}/api/preview`, {
     method: 'POST',
     body: fd,
   });

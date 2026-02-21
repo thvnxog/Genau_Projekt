@@ -118,7 +118,9 @@ def collect_counts_and_evidence(plan: dict, selected_diet: str) -> Tuple[
     """Aggregiert Counts und Evidence für eine Diet.
 
     Counts:
-    - `group_counts[group]`: wie oft kam `links.food_group == group` vor?
+    - `group_counts[group]`: wie oft kam `food_group` vor?
+      Neu: wenn `item.food_groups` (Liste) vorhanden ist, zählen wir jede Gruppe daraus.
+      Fallback bleibt `item.links.food_group`.
     - `tag_counts[tag]`:     wie oft kam ein Tag in `item.tags` vor?
 
     Evidence:
@@ -137,15 +139,21 @@ def collect_counts_and_evidence(plan: dict, selected_diet: str) -> Tuple[
         if not menu_included_for_diet(menu_type, selected_diet):
             continue
 
-        # raw_text ist ein "Beleg" für den Nutzer (welches Gericht/Item war das?)
         raw_text = item.get("raw_text")
 
-        # Enrichment-Links (z.B. food_group, später evtl. Food-IDs)
         links = item.get("links") or {}
-        group = links.get("food_group")
+        single_group = links.get("food_group")
 
-        # --- food_group zählen --------------------------------------------------
-        if group:
+        # --- food_group(s) zählen ----------------------------------------------
+        multi_groups = item.get("food_groups")
+        if isinstance(multi_groups, list) and multi_groups:
+            groups_to_count = [g for g in multi_groups if isinstance(g, str) and g.strip()]
+        elif single_group:
+            groups_to_count = [single_group]
+        else:
+            groups_to_count = []
+
+        for group in groups_to_count:
             group_counts[group] = group_counts.get(group, 0) + 1
             evidence_groups.setdefault(group, []).append(
                 {"weekday": weekday, "menu_type": menu_type, "raw_text": raw_text}

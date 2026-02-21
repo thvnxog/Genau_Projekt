@@ -167,48 +167,33 @@ def create_app():
 
         return plan
 
-    @app.post("/api/analyze")
-    def analyze():
-        """Analysiert einen hochgeladenen Speiseplan und gibt einen Dual-Report zurück.
+    def build_enriched_plan_from_xlsx_upload(f) -> tuple[dict, dict]:
+        """Parst eine hochgeladene XLSX (KW47-Template) in-memory und enrich't sie.
 
-        Erwartung:
-        - multipart/form-data Upload mit Feldname "file"
-        - aktuell: .xlsx im KW47-Template
+        Rückgabe:
+        - (plan, stats)
 
-        Ablauf (ohne Upload-Datei auf Disk zu speichern):
-        1) Upload holen
-        2) XLSX in-memory parsen -> foodplan-Format
-        3) Enrichment (food_group + tags)
-        4) Normalisieren (Datenhygiene)
-        5) Regeln laden
-        6) Evaluation (dual)
-        7) Report als JSON zurücckgeben
+        Hinweis: Diese Funktion speichert nichts auf Disk.
         """
 
-        # 1) Upload aus der HTTP-Anfrage lesen
-        f = request.files.get("file")
-        if not f:
-            abort(400, description="Kein Upload unter 'file' gefunden.")
-
-        # Dateiname bereinigen (Sicherheit) und Suffix bestimmen
-        filename = secure_filename(f.filename or "upload.json")
+        filename = secure_filename(f.filename or "upload.xlsx")
         suffix = Path(filename).suffix.lower()
-
-        # Datei NICHT speichern – nur in-memory verarbeiten
-        data = f.read()
-        bio = io.BytesIO(data)
-
-        # 2) Dateityp-Check: ab jetzt nur XLSX (KW47-Template)
         if suffix != ".xlsx":
             abort(400, description="Bitte eine .xlsx Datei im KW47-Template hochladen.")
 
-        # 3) XLSX parsen -> foodplan.json-Format
+        data = f.read()
+        bio = io.BytesIO(data)
+
         from scripts.parse_foodplan_xlsx import parse_foodplan_xlsx
+
         plan = parse_foodplan_xlsx(bio)
 
-
-        # 4) Enrichment: food_group + tags setzen
-        from scripts.enrich_foodplan import load_keyword_files, load_json_mapping, merge_keywords, enrich_plan
+        from scripts.enrich_foodplan import (
+            load_keyword_files,
+            load_json_mapping,
+            merge_keywords,
+            enrich_plan,
+        )
 
         base_dir = Path(__file__).resolve().parent  # backend/
         keywords_root = base_dir / "rules" / "keywords"
@@ -221,18 +206,72 @@ def create_app():
         group_keywords = merge_keywords(group_txt, group_json)
         tag_keywords = merge_keywords(tag_txt, tag_json)
 
-        plan, _stats = enrich_plan(plan, group_keywords, tag_keywords, bls_db_path=None)
-
-        # 5) Normalisieren (deine Datenhygiene)
+        plan, stats = enrich_plan(plan, group_keywords, tag_keywords, bls_db_path=None)
         plan = normalize_plan(plan)
 
-        # 6) Regeln laden (robust, relativ zu backend/)
+        return plan, stats
+
+    @app.post("/api/preview")
+    def preview():
+        """Preview-Endpunkt für den Selbstcheck.
+
+        Erwartet:
+        - multipart/form-data Upload mit Feldname "file" (.xlsx)
+
+        Liefert:
+        - den geparsten+enriched Plan (damit der User food_group/tags korrigieren kann)
+        - einfache Stats (wie viel gemappt wurde)
+        """
+
+        f = request.files.get("file")
+        if not f:
+            abort(400, description="Kein Upload unter 'file' gefunden.")
+
+        plan, stats = build_enriched_plan_from_xlsx_upload(f)
+
+        return {
+            "schema_version": "1.0",
+            "mode": "preview",
+            "plan": plan,
+            "stats": stats,
+        }
+
+    @app.post("/api/analyze")
+    def analyze():
+        """Analysiert einen hochgeladenen Speiseplan und gibt einen Dual-Report zurück.
+
+        Zwei Modi:
+        1) XLSX Upload (wie bisher): multipart/form-data mit Feld "file"
+        2) Korrigierter Plan: application/json Body { plan: <foodplan> }
+
+        Dadurch kann das Frontend erst einen Selbstcheck machen und dann den
+        user-korrigierten Plan zur Auswertung schicken.
+        """
+
+        plan = None
+
+        # (A) JSON-Body mit korrigiertem Plan
+        if request.is_json:
+            body = request.get_json(silent=True) or {}
+            candidate = body.get("plan")
+            if isinstance(candidate, dict):
+                plan = normalize_plan(candidate)
+
+        # (B) Fallback: XLSX Upload
+        if plan is None:
+            f = request.files.get("file")
+            if not f:
+                abort(400, description="Kein Upload unter 'file' gefunden.")
+            plan, _stats = build_enriched_plan_from_xlsx_upload(f)
+
+        base_dir = Path(__file__).resolve().parent  # backend/
+
+        # Regeln laden (robust, relativ zu backend/)
         rules_path = base_dir / "rules" / "dge_lunch_rules.json"
         if not rules_path.exists():
             abort(500, description="rules/dge_lunch_rules.json nicht gefunden (Pfad prüfen).")
         rules_doc = json.loads(rules_path.read_text(encoding="utf-8"))
 
-        # 7) Evaluation (dual)
         from scripts.evaluate_foodplan import evaluate_plan_for_diet
 
         report = {
@@ -240,13 +279,18 @@ def create_app():
             "mode": "dual",
             "mixed": evaluate_plan_for_diet(plan, rules_doc, "mixed"),
             "ovo_lacto_vegetarian": evaluate_plan_for_diet(plan, rules_doc, "ovo_lacto_vegetarian"),
-            "debug": {
-                # Upload wird nicht gespeichert; nur der Name wird zurückgegeben.
-                "source_filename": filename,
-            },
         }
         return report
 
+    # --- App-Start -------------------------------------------------------------
+
+    with app.app_context():
+        # Tabellen erstellen, falls noch nicht vorhanden.
+        # Das ist bequem im PoC. In "echten" Projekten macht man Migrationen.
+        db.create_all()
+
+    # Server starten (debug=True = Auto-Reload + bessere Errors)
+    app.run(host="127.0.0.1", port=5000, debug=True)
 
     return app
 
