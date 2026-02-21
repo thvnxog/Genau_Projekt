@@ -1,0 +1,12 @@
+{
+  "name": "genau-projekt",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently -n backend,frontend -c blue,green \"python backend/app.py\" \"npm --prefix frontend run dev\"",
+    "dev:backend": "python backend/app.py",
+    "dev:frontend": "npm --prefix frontend run dev"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.0"
+  }
+}

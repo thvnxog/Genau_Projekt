@@ -22,23 +22,10 @@ rm -f backend/instance/bls.db
 python backend/import_bls.py
 ```
 
-3. Backend starten
+3. Alle Services starten (Backend + Frontend)
 
 ```sh
-python backend/app.py
-```
-
-4. API testen
-
-```sh
-curl http://127.0.0.1:5000/health
-curl "http://127.0.0.1:5000/foods?q=apfel&limit=5"
-```
-
-5. (Optional) Frontend starten und im Browser testen
-
-```sh
-cd frontend
+# im Projekt-Root
 npm install
 npm run dev
 ```
@@ -47,7 +34,10 @@ Dann im Browser öffnen:
 
 - http://localhost:3000
 
-> Hinweis: Das Frontend nutzt die Route `frontend/app/api/analyze/route.ts`. Je nach Implementierung ruft diese Route intern das Flask-Backend auf oder verarbeitet die Daten selbst. Wenn im Frontend Fehler auftauchen: Backend starten und die DevTools-Konsole prüfen.
+Alternativ (manuell, in zwei Terminals):
+
+- Backend: `python backend/app.py`
+- Frontend: `cd frontend && npm install && npm run dev`
 
 ---
 
