@@ -212,6 +212,44 @@ Nützlich sind u.a.:
 - `foodplan.json`
 - `foodplan.enriched.json`
 
+### `foodplan.json` erzeugen (Parse aus XLSX)
+
+`foodplan.json` ist der **geparste Speiseplan** (noch ohne automatische Gruppen/Tags).
+Du kannst ihn aus einer Speiseplan-Excel im KW47-Layout erzeugen:
+
+```sh
+# im Projekt-Root ausführen
+python backend/scripts/parse_foodplan_xlsx.py \
+  --in backend/instance/uploads/Speiseplan_OS_Hermann_Bose_KW_47.xlsx \
+  --out backend/instance/testdata/foodplan.json
+```
+
+> Hinweis: Der Parser ist aktuell auf das Template ausgelegt (siehe Kommentar in `backend/scripts/parse_foodplan_xlsx.py`).
+
+### Empfohlene Pipeline
+
+1. XLSX -> `foodplan.json` (Parse)
+2. `foodplan.json` -> `foodplan.enriched.json` (Enrichment, siehe oben)
+
+### `foodplan.enriched.json` erzeugen (Enrichment)
+
+Wenn du nur `foodplan.json` hast, kannst du die angereicherte Version mit dem Enrichment-Skript erzeugen:
+
+```sh
+# im Projekt-Root ausführen
+python backend/scripts/enrich_foodplan.py \
+  --in backend/instance/testdata/foodplan.json \
+  --out backend/instance/testdata/foodplan.enriched.json \
+  --mapping-json backend/rules/bls_to_dge_groups.json \
+  --keywords-root backend/rules/keywords \
+  --bls-db backend/instance/bls.db
+```
+
+Hinweise:
+
+- `--bls-db` ist optional, verbessert aber das Matching, wenn die DB vorhanden ist.
+- Falls du (noch) keine DB importiert hast, kannst du `--bls-db` weglassen und nur Keyword-Matching verwenden.
+
 Diese Dateien kannst du im Frontend per Upload verwenden (falls aktiviert) oder als Referenz für erwartete Report-Strukturen.
 
 ## 8) Konfiguration (Umgebungsvariablen)

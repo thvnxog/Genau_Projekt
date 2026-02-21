@@ -1,6 +1,6 @@
 # backend/scripts/parse_foodplan_xlsx.py
 # ------------------------------------------------------------
-# Speiseplan XLSX (KW47-Layout) -> foodplan.json
+# Speiseplan XLSX (Layout) -> foodplan.json
 #
 # Annahmen (wie Speiseplan OS Hermann Böse KW 47):
 # - Sheet: "Tabelle1"
