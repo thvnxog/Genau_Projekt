@@ -2,7 +2,7 @@
 # ------------------------------------------------------------
 # Speiseplan XLSX (Layout) -> foodplan.json
 #
-# Annahmen (wie Speiseplan OS Hermann Böse KW 47):
+# Annahmen (aktuelles Template):
 # - Sheet: "Tabelle1"
 # - Spalte 0: Wochentage ("Montag"..."Freitag") markieren Tagesblöcke
 # - Mischkost-Block:   Spalten 1..3  (Name | Portion | Notes)
@@ -107,7 +107,7 @@ def parse_block(block_df: pd.DataFrame, name_col: int, amount_col: int, notes_co
 
 
 def parse_foodplan_xlsx(xlsx_input: Union[Path, IO[bytes]]) -> dict:
-    """Parst das KW47-XLSX-Template in unser foodplan.json-Format.
+    """Parst das XLSX-Template in unser foodplan.json-Format.
 
     `xlsx_input` kann sein:
     - `Path` (CLI / lokale Datei)
@@ -183,7 +183,7 @@ def parse_foodplan_xlsx(xlsx_input: Union[Path, IO[bytes]]) -> dict:
     )
     if total_items == 0:
         raise RuntimeError(
-            "0 Items extrahiert. Vermutlich passt das XLSX nicht zum KW47-Template (Sheet 'Tabelle1', Spalten A..J)."
+            "0 Items extrahiert. Vermutlich passt das XLSX nicht zum Template (Sheet 'Tabelle1', Spalten A..J)."
         )
 
     return plan

@@ -168,7 +168,7 @@ def create_app():
         return plan
 
     def build_enriched_plan_from_xlsx_upload(f) -> tuple[dict, dict]:
-        """Parst eine hochgeladene XLSX (KW47-Template) in-memory und enrich't sie.
+        """Parst eine hochgeladene XLSX (Template) in-memory und enrich't sie.
 
         Rückgabe:
         - (plan, stats)
@@ -179,7 +179,7 @@ def create_app():
         filename = secure_filename(f.filename or "upload.xlsx")
         suffix = Path(filename).suffix.lower()
         if suffix != ".xlsx":
-            abort(400, description="Bitte eine .xlsx Datei im KW47-Template hochladen.")
+            abort(400, description="Bitte eine .xlsx Datei im Template hochladen.")
 
         data = f.read()
         bio = io.BytesIO(data)
@@ -188,13 +188,16 @@ def create_app():
 
         try:
             plan = parse_foodplan_xlsx(bio)
-        except Exception:
+        except Exception as e:
             # Parser wirft z.B. RuntimeError bei 0 Items / falschem Template.
+            # Wir geben die konkrete Parser-Meldung zurück, damit man das Template gezielt korrigieren kann.
+            detail = str(e).strip() or "Unbekannter Parser-Fehler."
             abort(
                 400,
                 description=(
-                    "Datei ist ungültig. Bitte füllen Sie das KW47-Template korrekt aus "
-                    "(Sheet 'Tabelle1', Spalten A..J) und laden Sie die Datei erneut hoch."
+                    "Datei ist ungültig oder passt nicht zum Template. "
+                    "Bitte füllen Sie das Template korrekt aus und versuchen Sie es erneut.\n\n"
+                    f"Details: {detail}"
                 ),
             )
 
