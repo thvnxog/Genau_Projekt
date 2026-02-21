@@ -15,8 +15,9 @@
 import json
 import math
 import re
+import io
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, Union, IO
 
 import pandas as pd
 
@@ -105,16 +106,24 @@ def parse_block(block_df: pd.DataFrame, name_col: int, amount_col: int, notes_co
     return [it for it in items if it.get("raw_text")]
 
 
-def parse_foodplan_xlsx(xlsx_path: Path) -> dict:
-    df = pd.read_excel(
-    xlsx_path,
-    sheet_name="Tabelle1",
-    header=None,
-    usecols="A:J",      # nur 0..9 (genau deine Blöcke)
-    nrows=400,          # reicht locker fürs Template
-    engine="openpyxl"   # explizit, damit es stabil ist
-)
+def parse_foodplan_xlsx(xlsx_input: Union[Path, IO[bytes]]) -> dict:
+    """Parst das KW47-XLSX-Template in unser foodplan.json-Format.
 
+    `xlsx_input` kann sein:
+    - `Path` (CLI / lokale Datei)
+    - file-like object (z.B. `io.BytesIO` oder Flask Upload-Stream)
+
+    Hinweis: Diese Funktion speichert nichts auf Disk.
+    """
+
+    df = pd.read_excel(
+        xlsx_input,
+        sheet_name="Tabelle1",
+        header=None,
+        usecols="A:J",      # nur 0..9 (genau deine Blöcke)
+        nrows=400,          # reicht locker fürs Template
+        engine="openpyxl"   # explizit, damit es stabil ist
+    )
 
     # Tagesstartzeilen finden (Spalte 0)
     day_rows: List[int] = []
@@ -125,10 +134,14 @@ def parse_foodplan_xlsx(xlsx_path: Path) -> dict:
 
     if not day_rows:
         raise RuntimeError("Keine Tageszeilen (Montag-Freitag) in Spalte 0 gefunden. Format passt nicht.")
+    
+    
+    file_name = xlsx_input.name if isinstance(xlsx_input, Path) else None
+
 
     plan: Dict[str, Any] = {
         "schema_version": "1.0",
-        "source": {"type": "excel", "file": xlsx_path.name, "sheet": "Tabelle1"},
+        "source": {"type": "excel", "file": file_name, "sheet": "Tabelle1"},
         "context": {
             "school": None,
             "week_label": None,

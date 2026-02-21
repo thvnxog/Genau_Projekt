@@ -16,6 +16,7 @@ Hinweis:
 """
 
 import os
+import io
 import json
 from pathlib import Path
 
@@ -168,19 +169,20 @@ def create_app():
 
     @app.post("/api/analyze")
     def analyze():
-        """Analysiert einen hochgeladenen Foodplan (JSON) und gibt einen Dual-Report zurück.
+        """Analysiert einen hochgeladenen Speiseplan und gibt einen Dual-Report zurück.
 
         Erwartung:
         - multipart/form-data Upload mit Feldname "file"
-        - aktuell nur .json (Excel ist als nächster Schritt geplant)
+        - aktuell: .xlsx im KW47-Template
 
-        Ablauf:
-        1) Datei holen und (für Debug) im instance/uploads speichern
-        2) JSON laden
-        3) Foodplan normalisieren (Datenhygiene)
-        4) Regeldefinitionen laden (rules/dge_lunch_rules.json)
-        5) Evaluation ausführen (scripts/evaluate_foodplan.py)
-        6) Report als JSON zurückgeben
+        Ablauf (ohne Upload-Datei auf Disk zu speichern):
+        1) Upload holen
+        2) XLSX in-memory parsen -> foodplan-Format
+        3) Enrichment (food_group + tags)
+        4) Normalisieren (Datenhygiene)
+        5) Regeln laden
+        6) Evaluation (dual)
+        7) Report als JSON zurücckgeben
         """
 
         # 1) Upload aus der HTTP-Anfrage lesen
@@ -192,15 +194,9 @@ def create_app():
         filename = secure_filename(f.filename or "upload.json")
         suffix = Path(filename).suffix.lower()
 
-        # Für Debugging speichern wir Uploads in backend/instance/uploads/
-        # app.instance_path zeigt auf den instance-Ordner.
-        upload_dir = Path(app.instance_path) / "uploads"
-        upload_dir.mkdir(parents=True, exist_ok=True)
-        saved_path = upload_dir / filename
-        f.save(saved_path)
-        print("ANALYZE: saved", saved_path, "size:", saved_path.stat().st_size)
-        print("ANALYZE: start parse")
-
+        # Datei NICHT speichern – nur in-memory verarbeiten
+        data = f.read()
+        bio = io.BytesIO(data)
 
         # 2) Dateityp-Check: ab jetzt nur XLSX (KW47-Template)
         if suffix != ".xlsx":
@@ -208,7 +204,7 @@ def create_app():
 
         # 3) XLSX parsen -> foodplan.json-Format
         from scripts.parse_foodplan_xlsx import parse_foodplan_xlsx
-        plan = parse_foodplan_xlsx(saved_path)
+        plan = parse_foodplan_xlsx(bio)
 
 
         # 4) Enrichment: food_group + tags setzen
@@ -245,7 +241,7 @@ def create_app():
             "mixed": evaluate_plan_for_diet(plan, rules_doc, "mixed"),
             "ovo_lacto_vegetarian": evaluate_plan_for_diet(plan, rules_doc, "ovo_lacto_vegetarian"),
             "debug": {
-                "saved_upload": str(saved_path),
+                # Upload wird nicht gespeichert; nur der Name wird zurückgegeben.
                 "source_filename": filename,
             },
         }
