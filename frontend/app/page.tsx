@@ -460,10 +460,10 @@ export default function Page() {
   }
 
   return (
-    <main className='min-h-screen w-screen box-border bg-linear-to-b from-sky-50 via-white to-emerald-50/40 p-6 text-center font-sans text-slate-900'>
+    <main className='min-h-screen w-screen box-border bg-slate-50 p-6 text-center font-sans text-slate-900'>
       <h1 className='m-0 text-[28px] font-black'>GENAU – Speiseplan Check</h1>
 
-      <section className='mx-auto mt-5 grid w-full max-w-300 gap-3 rounded-xl border border-slate-200 bg-white/95 p-4 text-slate-900 shadow-soft backdrop-blur-sm'>
+      <section className='mx-auto mt-5 grid w-full max-w-300 gap-3 rounded-xl border border-slate-200 bg-white p-4 text-slate-900'>
         {/* Step indicator + Navigation */}
         {step !== 'selfcheck' && (
           <div className='flex flex-wrap items-center justify-between gap-2 rounded-xl border border-sky-100 bg-sky-50/80 p-3 text-left'>
@@ -477,7 +477,7 @@ export default function Page() {
             <div className='flex flex-wrap gap-2'>
               <button
                 type='button'
-                className='cursor-pointer rounded-[10px] border border-slate-300 bg-white px-3 py-2 text-sm font-extrabold text-slate-900 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60'
+                className='cursor-pointer rounded-[10px] border border-slate-300 bg-white px-3 py-2 text-sm font-extrabold text-slate-900 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60'
                 disabled={step === 'upload' || loading}
                 onClick={() => {
                   setError(null);
@@ -489,7 +489,7 @@ export default function Page() {
 
               <button
                 type='button'
-                className='cursor-pointer rounded-[10px] border border-teal-700 bg-teal-700 px-3 py-2 text-sm font-extrabold text-white hover:bg-teal-800 disabled:cursor-not-allowed disabled:opacity-60'
+                className='cursor-pointer rounded-[10px] border border-teal-700 bg-teal-700 px-3 py-2 text-sm font-extrabold text-white hover:bg-teal-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60'
                 disabled={loading}
                 onClick={async () => {
                   setError(null);
@@ -558,7 +558,7 @@ export default function Page() {
                 if (dropped) setFile(dropped);
               }}
               className={
-                'relative grid min-h-35 w-full cursor-pointer select-none place-items-center rounded-xl border-2 border-dashed p-4.5 text-center ' +
+                'relative grid min-h-35 w-full cursor-pointer select-none place-items-center rounded-xl border-2 border-dashed p-4.5 text-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600 focus-visible:ring-offset-2 ' +
                 (isDragging
                   ? 'border-teal-600 bg-teal-50'
                   : 'border-sky-200 bg-sky-50')
@@ -573,7 +573,7 @@ export default function Page() {
                     e.stopPropagation();
                     clearSelectedFile();
                   }}
-                  className='absolute right-2.5 top-2.5 grid h-7.5 w-7.5 cursor-pointer place-items-center rounded-full border border-sky-200 bg-white text-slate-900 hover:bg-sky-50'
+                  className='absolute right-2.5 top-2.5 grid h-7.5 w-7.5 cursor-pointer place-items-center rounded-full border border-sky-200 bg-white text-slate-900 hover:bg-sky-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600 focus-visible:ring-offset-2'
                 >
                   <svg
                     width='16'
@@ -638,12 +638,12 @@ export default function Page() {
               </div>
             </div>
 
-            <div className='text-left text-xs text-slate-600'>
+            <div className='text-left text-xs text-slate-700'>
               Vorlage nötig?{' '}
               <a
                 href='/Speiseplan_Template.xlsx'
                 download
-                className='font-bold text-slate-900 underline underline-offset-2'
+                className='font-bold text-slate-900 underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600 focus-visible:ring-offset-2'
               >
                 Template herunterladen
               </a>
@@ -657,11 +657,11 @@ export default function Page() {
           <section className='grid gap-4.5 text-left'>
             <div className='rounded-xl border border-slate-200 bg-slate-50 p-3.5'>
               <div className='font-black'>Lebensmittelgruppen prüfen</div>
-              <div className='mt-1 text-sm text-slate-700'>
+              <div className='mt-1 text-sm text-slate-800'>
                 Standardmäßig werden nur Gerichte angezeigt, bei denen keine
                 Gruppe erkannt wurde.
               </div>
-              <div className='mt-2 text-xs text-slate-600'>
+              <div className='mt-2 text-xs text-slate-700'>
                 Items im Plan: <b>{draftItemCount}</b>
               </div>
             </div>
@@ -715,15 +715,15 @@ export default function Page() {
                           }}
                           className='rounded-lg border border-slate-100 bg-slate-50 p-3'
                         >
-                          <summary className='cursor-pointer select-none text-sm font-extrabold'>
+                          <summary className='cursor-pointer select-none rounded text-sm font-extrabold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600 focus-visible:ring-offset-2'>
                             Menü: {menu.menu_type}{' '}
                             {missingCount > 0 ? (
                               <span className='ml-2 rounded-full border border-slate-200 bg-white px-2 py-0.5 text-xs font-black text-slate-700'>
-                                ⚠️ {missingCount} ohne Food-Gruppe
+                                ⚠️ {missingCount} ohne Gruppe
                               </span>
                             ) : (
                               recognizedGroupsLabel && (
-                                <span className='ml-2 text-xs font-bold text-slate-600'>
+                                <span className='ml-2 text-xs font-bold text-slate-700'>
                                   Erkannt: {recognizedGroupsLabel}
                                 </span>
                               )
@@ -750,7 +750,7 @@ export default function Page() {
                                     key={itemIdx}
                                     className='rounded-lg border border-slate-200 bg-white'
                                   >
-                                    <summary className='cursor-pointer select-none p-2.5 text-sm font-bold flex items-center gap-2'>
+                                    <summary className='cursor-pointer select-none rounded p-2.5 text-sm font-bold flex items-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600 focus-visible:ring-offset-2'>
                                       <span>
                                         {recognizedGroup ? '✓' : '⚠️'}
                                       </span>
@@ -763,7 +763,7 @@ export default function Page() {
                                         <div className='text-xs font-bold text-slate-700 mb-2'>
                                           Lebensmittelgruppen
                                         </div>
-                                        <div className='text-[11px] font-normal text-slate-600 mb-3'>
+                                        <div className='text-[11px] font-normal text-slate-700 mb-3'>
                                           Wähle alle zutreffenden Gruppen aus.
                                         </div>
 
@@ -816,7 +816,7 @@ export default function Page() {
 
                                       {/* Tags Section (Collapsible) */}
                                       <details className='group'>
-                                        <summary className='cursor-pointer select-none text-xs font-bold text-slate-700 flex items-center gap-2 hover:text-slate-900'>
+                                        <summary className='cursor-pointer select-none rounded text-xs font-bold text-slate-800 flex items-center gap-2 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600 focus-visible:ring-offset-2'>
                                           <span className='transition-transform group-open:rotate-90'>
                                             ▶
                                           </span>
@@ -824,7 +824,7 @@ export default function Page() {
                                         </summary>
 
                                         <div className='mt-3 space-y-2 pl-4 border-l-2 border-slate-200'>
-                                          <div className='text-[11px] font-normal text-slate-600'>
+                                          <div className='text-[11px] font-normal text-slate-700'>
                                             Falls im Speiseplan nicht eindeutig
                                             erkennbar.
                                           </div>
@@ -865,7 +865,7 @@ export default function Page() {
                                       </details>
 
                                       {/* Summary */}
-                                      <div className='mt-2 text-[11px] text-slate-500 pt-2 border-t border-slate-100'>
+                                      <div className='mt-2 text-[11px] text-slate-600 pt-2 border-t border-slate-100'>
                                         Gruppen (für Auswertung):{' '}
                                         <b>
                                           {(() => {
@@ -888,7 +888,7 @@ export default function Page() {
                               })}
 
                             {missingCount === 0 && (
-                              <div className='text-xs text-slate-500'>
+                              <div className='text-xs text-slate-600'>
                                 In diesem Menü wurde überall eine Gruppe
                                 erkannt.
                               </div>
@@ -912,7 +912,7 @@ export default function Page() {
                 <div className='flex flex-wrap gap-2'>
                   <button
                     type='button'
-                    className='cursor-pointer rounded-[10px] border border-slate-300 bg-white px-3 py-2 text-sm font-extrabold text-slate-900 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60'
+                    className='cursor-pointer rounded-[10px] border border-slate-300 bg-white px-3 py-2 text-sm font-extrabold text-slate-900 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60'
                     disabled={loading}
                     onClick={() => {
                       setError(null);
@@ -924,7 +924,7 @@ export default function Page() {
 
                   <button
                     type='button'
-                    className='cursor-pointer rounded-[10px] border border-teal-700 bg-teal-700 px-3.5 py-2 text-sm font-extrabold text-white hover:bg-teal-800 disabled:cursor-not-allowed disabled:opacity-60'
+                    className='cursor-pointer rounded-[10px] border border-teal-700 bg-teal-700 px-3.5 py-2 text-sm font-extrabold text-white hover:bg-teal-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60'
                     disabled={loading}
                     onClick={analyzeCorrectedPlan}
                   >
@@ -941,24 +941,24 @@ export default function Page() {
           <section className='grid gap-4.5'>
             {missingFoodGroupCount > 0 && (
               <details className='rounded-xl border border-amber-200 bg-amber-50 p-3 text-left text-slate-900'>
-                <summary className='cursor-pointer select-none font-extrabold flex items-center gap-2'>
+                <summary className='cursor-pointer select-none rounded font-extrabold flex items-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600 focus-visible:ring-offset-2'>
                   <span className='text-lg'>⚠️</span>
                   <span>
                     Hinweis – {missingFoodGroupCount} Gerichte ohne Zuordnung
                   </span>
                 </summary>
 
-                <div className='mt-3 text-sm text-slate-700'>
+                <div className='mt-3 text-sm text-slate-800'>
                   <div className='mb-2'>
                     Für diese {missingFoodGroupCount} Gerichte konnte keine
-                    passende Food-Group erkannt werden. Du kannst die
+                    passende Lebensmittel-Gruppe erkannt werden. Du kannst die
                     Zuordnungen im Selbstcheck ergänzen und den Report danach
                     neu berechnen.
                   </div>
 
                   <button
                     type='button'
-                    className='cursor-pointer rounded-[10px] border border-teal-700 bg-teal-700 px-3 py-2 text-sm font-extrabold text-white hover:bg-teal-800 disabled:cursor-not-allowed disabled:opacity-60'
+                    className='cursor-pointer rounded-[10px] border border-teal-700 bg-teal-700 px-3 py-2 text-sm font-extrabold text-white hover:bg-teal-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60'
                     disabled={loading}
                     onClick={() => {
                       setError(null);
