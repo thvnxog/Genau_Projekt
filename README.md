@@ -304,3 +304,7 @@ npm run dev
     - `backend/rules/keywords/tags/`: Keywords je Tag (optional)
 - `backend/instance/bls.db`: SQLite Datenbankdatei (wird beim Import erzeugt)
 - `backend/instance/uploads/`: optionaler Ordner (derzeit nicht genutzt) – Uploads werden in-memory verarbeitet und nicht auf Disk gespeichert
+
+  ## 11) Transparenz: Einsatz von KI
+
+  Im Rahmen der Entwicklung wurde KI punktuell zur Ideengenerierung (Brainstorming) sowie als Programmierassistenz genutzt. Die originären Projektideen, die Auswahl der Lösungswege und die fachliche Verantwortung liegen bei mir. KI-generierte Inhalte wurden nicht ungeprüft übernommen, sondern eigenständig überprüft, überarbeitet und testbasiert abgesichert.
