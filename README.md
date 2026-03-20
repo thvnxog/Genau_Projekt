@@ -191,7 +191,44 @@ Dann:
 
 - http://localhost:3000
 
-## 7) Konfiguration (Umgebungsvariablen)
+## 7) Tests (Unit Tests)
+
+Für die ersten Backend-Unit-Tests verwenden wir `pytest`.
+
+### Einmalig installieren
+
+Im Projekt-Root (mit aktiver venv):
+
+```sh
+source .venv/bin/activate
+pip install pytest
+```
+
+### Alle Tests ausführen
+
+```sh
+.venv/bin/python -m pytest backend/tests -q
+```
+
+### Einzelne Datei testen
+
+```sh
+.venv/bin/python -m pytest backend/tests/test_parse_foodplan_xlsx.py -q
+```
+
+### Einzelnen Testfall ausführen
+
+```sh
+.venv/bin/python -m pytest backend/tests/test_parse_foodplan_xlsx.py::test_parse_month_example_groups_into_4_weeks_and_20_days -q
+```
+
+Aktuell enthalten die Tests u.a. Prüfungen für:
+
+- Erkennung von Zubereitungsfragmenten (`ueberbacken`, `frittiert`, ...)
+- korrektes Zusammenführen von Fortsetzungszeilen
+- Monatsbeispiel-Datei mit 4 Wochen / 20 Tagen
+
+## 8) Konfiguration (Umgebungsvariablen)
 
 Umgebungsvariablen (Environment Variables) sind **optionale Einstellungen**, die du im Terminal setzt, damit Skripte/Apps anders arbeiten, **ohne dass du Code ändern musst**.
 
@@ -216,7 +253,7 @@ python backend/import_bls.py
 | --------------- | -------------------------------------- | -------------------------------------- |
 | `BLS_XLSX_PATH` | Pfad zur BLS-Exceldatei für den Import | `export BLS_XLSX_PATH="/tmp/BLS.xlsx"` |
 
-## 8) Häufige Probleme
+## 9) Häufige Probleme
 
 ### `ModuleNotFoundError: No module named 'flask'`
 
@@ -249,9 +286,9 @@ npm install
 
 # Dev-Server starten
 npm run dev
+```
 
-
-## 9) Projekt-Dateien (Kurzüberblick)
+## 10) Projekt-Dateien (Kurzüberblick)
 
 - `backend/app.py`: Flask-API (Routes)
 - `backend/models.py`: SQLAlchemy Modelle + `to_dict()`
@@ -267,4 +304,3 @@ npm run dev
     - `backend/rules/keywords/tags/`: Keywords je Tag (optional)
 - `backend/instance/bls.db`: SQLite Datenbankdatei (wird beim Import erzeugt)
 - `backend/instance/uploads/`: optionaler Ordner (derzeit nicht genutzt) – Uploads werden in-memory verarbeitet und nicht auf Disk gespeichert
-```
