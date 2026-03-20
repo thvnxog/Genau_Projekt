@@ -181,28 +181,47 @@ function RulesList({
     .filter((r: RuleResult) => (onlyFailed ? !r.passed : true));
 
   return (
-    <div className='mt-2.5 grid gap-2.5'>
+    <div className='mt-2 grid gap-2'>
       {rules.map((r: RuleResult) => (
         <div
           key={r.id}
           className={
-            'rounded-xl border border-slate-300 p-3 text-slate-900 ' +
-            (r.passed ? 'bg-emerald-100' : 'bg-red-100')
+            'rounded-lg border border-slate-200 p-2.5 text-slate-900 ' +
+            (r.passed
+              ? 'bg-emerald-50 border-l-4 border-l-emerald-500'
+              : 'bg-red-50 border-l-4 border-l-red-500')
           }
         >
-          <div className='flex justify-between gap-2.5'>
-            <div className='font-extrabold'>{r.label}</div>
-            <div className='font-black'>{r.passed ? '✅' : '❌'}</div>
+          <div className='flex items-start justify-between gap-2'>
+            <div className='text-sm font-bold leading-snug'>{r.label}</div>
+            <div
+              className={
+                'rounded-full px-2 py-0.5 text-[11px] font-extrabold ' +
+                (r.passed
+                  ? 'bg-emerald-100 text-emerald-800'
+                  : 'bg-red-100 text-red-800')
+              }
+            >
+              {r.passed ? 'Erfüllt' : 'Nicht erfüllt'}
+            </div>
           </div>
 
           {(r.expected !== undefined || r.actual !== undefined) && (
-            <div className='mt-1.5'>
-              Erwartet: <b>{r.expected ?? '-'}</b> • Ist:{' '}
-              <b>{r.actual ?? '-'}</b>
+            <div className='mt-1.5 flex flex-wrap gap-1.5 text-[11px] text-slate-700'>
+              <span className='rounded bg-white px-1.5 py-0.5 border border-slate-200'>
+                Erwartet: <b>{r.expected ?? '-'}</b>
+              </span>
+              <span className='rounded bg-white px-1.5 py-0.5 border border-slate-200'>
+                Ist: <b>{r.actual ?? '-'}</b>
+              </span>
             </div>
           )}
 
-          {r.notes && <div className='mt-1.5'>{r.notes}</div>}
+          {r.notes && (
+            <div className='mt-1.5 text-xs leading-snug text-slate-600'>
+              {r.notes}
+            </div>
+          )}
         </div>
       ))}
     </div>
