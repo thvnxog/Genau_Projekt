@@ -305,6 +305,16 @@ npm run dev
 - `backend/instance/bls.db`: SQLite Datenbankdatei (wird beim Import erzeugt)
 - `backend/instance/uploads/`: optionaler Ordner (derzeit nicht genutzt) – Uploads werden in-memory verarbeitet und nicht auf Disk gespeichert
 
+- `frontend/app/page.tsx`: steuert den Frontend-Ablauf (Upload -> Report -> Selbstcheck) und verwaltet den Haupt-UI-State
+- `frontend/app/lib/foodplan.ts`: gemeinsame Typen, Labels, Styles und kleine Helper-Funktionen für Foodgroups/Tags
+- `frontend/app/components/navigation/StepNavigation.tsx`: Schrittanzeige + Navigation zwischen Upload und Report
+- `frontend/app/components/upload/UploadSection.tsx`: Upload-UI mit Klick/Drag-and-Drop + Template-Link
+- `frontend/app/components/selfcheck/SelfCheckSection.tsx`: Selbstcheck-UI zum Bearbeiten von Foodgroups/Tags und erneuten Auswerten
+- `frontend/app/components/report/ReportSection.tsx`: Report-Container (Warnhinweis, Monats-/Wochenansicht, Regelbereiche)
+- `frontend/app/components/report/ReportCards.tsx`: wiederverwendbare Report-Bausteine (`ScoreCard`, `RulesList`)
+- `frontend/app/api/preview/route.ts`: Next.js-Proxyroute für Preview-Requests zum Backend
+- `frontend/app/api/analyze/route.ts`: Next.js-Proxyroute für Analyse-Requests zum Backend
+
   ## 11) Transparenz: Einsatz von KI
 
   Im Rahmen der Entwicklung wurde KI punktuell zur Ideengenerierung (Brainstorming) sowie als Programmierassistenz genutzt. Die originären Projektideen, die Auswahl der Lösungswege und die fachliche Verantwortung liegen bei mir. KI-generierte Inhalte wurden nicht ungeprüft übernommen, sondern eigenständig überprüft, überarbeitet und testbasiert abgesichert.
