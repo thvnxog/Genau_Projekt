@@ -535,8 +535,37 @@ export default function Page() {
         )}
 
         {error && (
-          <div className='whitespace-pre-wrap text-left text-red-600'>
-            {error}
+          <div
+            role='alert'
+            aria-live='assertive'
+            className='rounded-xl border border-red-200 bg-red-50 p-3 text-left text-red-900'
+          >
+            <div className='flex items-start gap-2'>
+              <span className='text-base font-black'>⚠️</span>
+              <div>
+                <div className='text-sm font-extrabold'>
+                  Upload fehlgeschlagen
+                </div>
+                <div className='mt-1 text-xs text-red-800'>
+                  Bitte Datei/Format prüfen und erneut versuchen.
+                </div>
+
+                <div className='mt-2 space-y-1'>
+                  {error
+                    .split('\n')
+                    .map((line) => line.trim())
+                    .filter(Boolean)
+                    .map((line, idx) => (
+                      <div
+                        key={idx}
+                        className='text-sm leading-snug text-red-900'
+                      >
+                        {line.startsWith('-') ? line : `• ${line}`}
+                      </div>
+                    ))}
+                </div>
+              </div>
+            </div>
           </div>
         )}
 
