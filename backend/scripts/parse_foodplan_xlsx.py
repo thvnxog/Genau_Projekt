@@ -53,6 +53,22 @@ def norm_cell(x) -> Optional[str]:
     return s if s else None
 
 
+def is_week_header(value: Optional[str]) -> bool:
+    """Erkennt Headerzeilen wie "Speiseplan vom ... bis ..."."""
+    if not value:
+        return False
+    v = value.strip().lower()
+    return v.startswith("speiseplan vom")
+
+
+def extract_week_label(value: Optional[str], fallback_index: int) -> str:
+    """Leitet ein lesbares Wochenlabel aus der Headerzeile ab."""
+    if not value:
+        return f"Woche {fallback_index + 1}"
+    cleaned = re.sub(r"\s+", " ", value).strip()
+    return cleaned or f"Woche {fallback_index + 1}"
+
+
 def parse_amount(text: Optional[str]) -> Optional[dict]:
     """
     Portion sehr simpel parsen:
@@ -187,17 +203,18 @@ def parse_foodplan_xlsx(xlsx_input: Union[Path, IO[bytes]]) -> dict:
         engine="openpyxl"   # explizit, damit es stabil ist
     )
 
-    # Tagesstartzeilen finden (Spalte 0)
-    day_rows: List[int] = []
+    # Monats-/Mehrwochen-Dateien enthalten oft mehrere wiederholte Wochenblöcke,
+    # die jeweils mit "Speiseplan vom ..." beginnen.
+    week_header_rows: List[int] = []
     for i in df.index:
         v = norm_cell(df.loc[i, 0])
-        if v and v.lower() in DAYS:
-            day_rows.append(i)
+        if is_week_header(v):
+            week_header_rows.append(i)
 
-    if not day_rows:
-        raise RuntimeError("Keine Tageszeilen (Montag-Freitag) in Spalte 0 gefunden. Format passt nicht.")
-    
-    
+    # Fallback: wenn kein Wochenheader vorhanden ist, behandeln wir das gesamte Sheet als eine Woche.
+    if not week_header_rows:
+        week_header_rows = [0]
+
     file_name = xlsx_input.name if isinstance(xlsx_input, Path) else None
 
 
@@ -211,31 +228,60 @@ def parse_foodplan_xlsx(xlsx_input: Union[Path, IO[bytes]]) -> dict:
             "meal_type": "lunch",
             "timezone": "Europe/Berlin"
         },
-        "days": []
+        "days": [],
+        "weeks": [],
     }
 
-    for idx, start in enumerate(day_rows):
-        end = day_rows[idx + 1] if idx + 1 < len(day_rows) else len(df)
+    for week_idx, week_start in enumerate(week_header_rows):
+        week_end = week_header_rows[week_idx + 1] if week_idx + 1 < len(week_header_rows) else len(df)
+        week_df = df.iloc[week_start:week_end].reset_index(drop=True)
 
-        weekday = norm_cell(df.loc[start, 0])
-        block = df.iloc[start:end].copy()
+        week_label = extract_week_label(norm_cell(df.loc[week_start, 0]), week_idx)
 
-        # den Wochentag aus dem Block entfernen
-        block.iat[0, 0] = None
+        day_rows_in_week: List[int] = []
+        for i in week_df.index:
+            v = norm_cell(week_df.loc[i, 0])
+            if v and v.lower() in DAYS:
+                day_rows_in_week.append(i)
 
-        mischkost = parse_block(block, 1, 2, 3)
-        vegetarisch = parse_block(block, 4, 5, 6)
-        dessert = parse_block(block, 7, 8, 9)
+        if not day_rows_in_week:
+            continue
 
-        plan["days"].append({
-            "date": None,
-            "weekday": weekday,
-            "menus": [
-                {"menu_type": "mischkost", "items": mischkost},
-                {"menu_type": "vegetarisch", "items": vegetarisch},
-                {"menu_type": "dessert", "items": dessert},
-            ]
-        })
+        week_days: List[dict] = []
+        for idx, start in enumerate(day_rows_in_week):
+            end = day_rows_in_week[idx + 1] if idx + 1 < len(day_rows_in_week) else len(week_df)
+
+            weekday = norm_cell(week_df.loc[start, 0])
+            block = week_df.iloc[start:end].copy()
+
+            # den Wochentag aus dem Block entfernen
+            block.iat[0, 0] = None
+
+            mischkost = parse_block(block, 1, 2, 3)
+            vegetarisch = parse_block(block, 4, 5, 6)
+            dessert = parse_block(block, 7, 8, 9)
+
+            day_doc = {
+                "date": None,
+                "weekday": weekday,
+                "week_index": week_idx,
+                "week_label": week_label,
+                "menus": [
+                    {"menu_type": "mischkost", "items": mischkost},
+                    {"menu_type": "vegetarisch", "items": vegetarisch},
+                    {"menu_type": "dessert", "items": dessert},
+                ]
+            }
+            week_days.append(day_doc)
+            plan["days"].append(day_doc)
+
+        plan["weeks"].append(
+            {
+                "week_index": week_idx,
+                "week_label": week_label,
+                "days": week_days,
+            }
+        )
 
     # Wenn gar keine Items extrahiert wurden, ist das XLSX-Format sehr wahrscheinlich falsch.
     total_items = sum(

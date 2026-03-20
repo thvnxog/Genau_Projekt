@@ -23,6 +23,25 @@ type ReportDual = {
   ovo_lacto_vegetarian: ReportSingle;
 };
 
+type WeeklyReportDual = {
+  week_index: number;
+  week_label: string;
+  mixed: ReportSingle;
+  ovo_lacto_vegetarian: ReportSingle;
+};
+
+type ReportMonthlyDual = {
+  mode: 'monthly_dual';
+  monthly_summary: {
+    weeks: number;
+    mixed: ReportSingle['summary'];
+    ovo_lacto_vegetarian: ReportSingle['summary'];
+  };
+  weekly_reports: WeeklyReportDual[];
+};
+
+type AnalyzeResponse = ReportDual | ReportMonthlyDual;
+
 // --- Self-check types -------------------------------------------------
 
 type PlanItem = {
@@ -41,6 +60,8 @@ type PlanMenu = {
 
 type PlanDay = {
   weekday?: string;
+  week_index?: number;
+  week_label?: string;
   menus?: PlanMenu[];
 };
 
@@ -236,7 +257,8 @@ export default function Page() {
   const [error, setError] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
 
-  const [dual, setDual] = useState<ReportDual | null>(null);
+  const [reportData, setReportData] = useState<AnalyzeResponse | null>(null);
+  const [activeWeekIndex, setActiveWeekIndex] = useState(0);
 
   // NEU: Self-check state
   const [preview, setPreview] = useState<PreviewResponse | null>(null);
@@ -258,19 +280,21 @@ export default function Page() {
   // Entfernt die ausgewählte Datei und leert zusätzlich den versteckten File-Input.
   function clearSelectedFile() {
     setFile(null);
-    setDual(null);
+    setReportData(null);
     setPreview(null);
     setPlanDraft(null);
     setError(null);
+    setActiveWeekIndex(0);
     setStep('upload');
     if (fileInputRef.current) fileInputRef.current.value = '';
   }
 
   async function startSelfCheck() {
     setError(null);
-    setDual(null);
+    setReportData(null);
     setPreview(null);
     setPlanDraft(null);
+    setActiveWeekIndex(0);
 
     if (!file) {
       setError('Bitte eine Datei auswählen (.xlsx).');
@@ -332,14 +356,17 @@ export default function Page() {
         throw new Error(msg || `HTTP ${analyzeRes.status}`);
       }
 
-      const report = (await analyzeRes.json()) as ReportDual;
-      if (!report || report.mode !== 'dual') {
+      const report = (await analyzeRes.json()) as AnalyzeResponse;
+      if (
+        !report ||
+        (report.mode !== 'dual' && report.mode !== 'monthly_dual')
+      ) {
         throw new Error(
-          'Backend hat keinen dual-Report geliefert (erwarte mode="dual").',
+          'Backend hat keinen Report geliefert (erwarte mode="dual" oder "monthly_dual").',
         );
       }
 
-      setDual(report);
+      setReportData(report);
       setStep('report');
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Unbekannter Fehler');
@@ -350,7 +377,7 @@ export default function Page() {
 
   async function analyzeCorrectedPlan() {
     setError(null);
-    setDual(null);
+    setReportData(null);
 
     if (!planDraft) {
       setError('Kein Plan zum Auswerten vorhanden. Erst Selbstcheck starten.');
@@ -370,14 +397,14 @@ export default function Page() {
         throw new Error(msg || `HTTP ${res.status}`);
       }
 
-      const data = (await res.json()) as ReportDual;
-      if (!data || data.mode !== 'dual') {
+      const data = (await res.json()) as AnalyzeResponse;
+      if (!data || (data.mode !== 'dual' && data.mode !== 'monthly_dual')) {
         throw new Error(
-          'Backend hat keinen dual-Report geliefert (erwarte mode="dual").',
+          'Backend hat keinen Report geliefert (erwarte mode="dual" oder "monthly_dual").',
         );
       }
 
-      setDual(data);
+      setReportData(data);
       setStep('report');
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Unbekannter Fehler');
@@ -937,7 +964,7 @@ export default function Page() {
         )}
 
         {/* STEP 3: REPORT */}
-        {step === 'report' && dual && (
+        {step === 'report' && reportData && (
           <section className='grid gap-4.5'>
             {missingFoodGroupCount > 0 && (
               <details className='rounded-xl border border-amber-200 bg-amber-50 p-3 text-left text-slate-900'>
@@ -971,22 +998,117 @@ export default function Page() {
               </details>
             )}
 
-            <div className='grid grid-cols-1 gap-3 md:grid-cols-2'>
-              <ScoreCard title='Mischkost' rep={dual.mixed} />
-              <ScoreCard title='Vegetarisch' rep={dual.ovo_lacto_vegetarian} />
-            </div>
+            {reportData.mode === 'monthly_dual' && (
+              <div className='rounded-xl border border-sky-100 bg-sky-50/70 p-3 text-left text-slate-900'>
+                <div className='text-sm font-extrabold'>
+                  Monatsübersicht ({reportData.monthly_summary.weeks} Wochen)
+                </div>
+                <div className='mt-2 grid grid-cols-1 gap-2 md:grid-cols-2'>
+                  <div className='rounded-lg border border-slate-200 bg-white p-2'>
+                    <div className='text-xs font-bold text-slate-700'>
+                      Mischkost
+                    </div>
+                    <div className='text-sm font-extrabold text-slate-900'>
+                      {(reportData.monthly_summary.mixed.score * 100).toFixed(
+                        1,
+                      )}
+                      %
+                    </div>
+                    <div className='text-xs text-slate-700'>
+                      {reportData.monthly_summary.mixed.passed_rules}/
+                      {reportData.monthly_summary.mixed.applicable_rules} Regeln
+                    </div>
+                  </div>
+                  <div className='rounded-lg border border-slate-200 bg-white p-2'>
+                    <div className='text-xs font-bold text-slate-700'>
+                      Vegetarisch
+                    </div>
+                    <div className='text-sm font-extrabold text-slate-900'>
+                      {(
+                        reportData.monthly_summary.ovo_lacto_vegetarian.score *
+                        100
+                      ).toFixed(1)}
+                      %
+                    </div>
+                    <div className='text-xs text-slate-700'>
+                      {
+                        reportData.monthly_summary.ovo_lacto_vegetarian
+                          .passed_rules
+                      }
+                      /
+                      {
+                        reportData.monthly_summary.ovo_lacto_vegetarian
+                          .applicable_rules
+                      }{' '}
+                      Regeln
+                    </div>
+                  </div>
+                </div>
 
-            <div className='grid grid-cols-1 gap-3 md:grid-cols-2'>
-              <div>
-                <h2 className='text-lg font-black'>Regeln – Mischkost</h2>
-                <RulesList rep={dual.mixed} onlyFailed={false} />
+                <div className='mt-3'>
+                  <div className='mb-1 text-xs font-bold text-slate-700'>
+                    Wochenansicht
+                  </div>
+                  <div className='flex flex-wrap gap-2'>
+                    {reportData.weekly_reports.map((w, idx) => (
+                      <button
+                        key={w.week_index}
+                        type='button'
+                        onClick={() => setActiveWeekIndex(idx)}
+                        className={`cursor-pointer rounded-full border px-3 py-1 text-xs font-bold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600 focus-visible:ring-offset-2 ${
+                          idx === activeWeekIndex
+                            ? 'border-teal-700 bg-teal-700 text-white'
+                            : 'border-slate-300 bg-white text-slate-800 hover:bg-slate-50'
+                        }`}
+                      >
+                        {w.week_label || `Woche ${w.week_index + 1}`}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
+            )}
 
-              <div>
-                <h2 className='text-lg font-black'>Regeln – Vegetarisch</h2>
-                <RulesList rep={dual.ovo_lacto_vegetarian} onlyFailed={false} />
-              </div>
-            </div>
+            {(() => {
+              const active =
+                reportData.mode === 'monthly_dual'
+                  ? reportData.weekly_reports[
+                      Math.min(
+                        Math.max(activeWeekIndex, 0),
+                        Math.max(0, reportData.weekly_reports.length - 1),
+                      )
+                    ]
+                  : reportData;
+
+              return (
+                <>
+                  <div className='grid grid-cols-1 gap-3 md:grid-cols-2'>
+                    <ScoreCard title='Mischkost' rep={active.mixed} />
+                    <ScoreCard
+                      title='Vegetarisch'
+                      rep={active.ovo_lacto_vegetarian}
+                    />
+                  </div>
+
+                  <div className='grid grid-cols-1 gap-3 md:grid-cols-2'>
+                    <div>
+                      <h2 className='text-lg font-black'>Regeln – Mischkost</h2>
+                      <RulesList rep={active.mixed} onlyFailed={false} />
+                    </div>
+
+                    <div>
+                      <h2 className='text-lg font-black'>
+                        Regeln – Vegetarisch
+                      </h2>
+                      <RulesList
+                        rep={active.ovo_lacto_vegetarian}
+                        onlyFailed={false}
+                      />
+                    </div>
+                  </div>
+                </>
+              );
+            })()}
           </section>
         )}
       </section>

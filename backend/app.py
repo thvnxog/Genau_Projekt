@@ -19,6 +19,7 @@ import os
 import io
 import json
 from pathlib import Path
+from collections import defaultdict
 
 # secure_filename sorgt dafür, dass Dateinamen "sicher" sind (keine ../ Traversal, keine Sonderzeichen)
 from werkzeug.utils import secure_filename
@@ -287,13 +288,99 @@ def create_app():
 
         from scripts.evaluate_foodplan import evaluate_plan_for_diet
 
-        report = {
-            "schema_version": "1.0",
-            "mode": "dual",
-            "mixed": evaluate_plan_for_diet(plan, rules_doc, "mixed"),
-            "ovo_lacto_vegetarian": evaluate_plan_for_diet(plan, rules_doc, "ovo_lacto_vegetarian"),
+        def split_plan_into_week_plans(plan_doc: dict):
+            """Gruppiert einen Plan in Teilpläne pro Woche (über day.week_index)."""
+            days = plan_doc.get("days", []) or []
+            if not days:
+                return []
+
+            grouped = defaultdict(list)
+            labels = {}
+            for day in days:
+                idx = day.get("week_index")
+                if idx is None:
+                    idx = 0
+                try:
+                    idx = int(idx)
+                except Exception:
+                    idx = 0
+
+                grouped[idx].append(day)
+                if idx not in labels:
+                    labels[idx] = day.get("week_label") or f"Woche {idx + 1}"
+
+            out = []
+            for idx in sorted(grouped.keys()):
+                out.append(
+                    {
+                        "week_index": idx,
+                        "week_label": labels.get(idx) or f"Woche {idx + 1}",
+                        "plan": {
+                            "schema_version": plan_doc.get("schema_version", "1.0"),
+                            "days": grouped[idx],
+                        },
+                    }
+                )
+            return out
+
+        def summarize_week_reports(week_reports: list, key: str):
+            """Aggregiert Wochenreports zu einer Monats-Zusammenfassung je Diet."""
+            applicable = 0
+            passed = 0
+            for w in week_reports:
+                summary = (w.get(key) or {}).get("summary") or {}
+                applicable += int(summary.get("applicable_rules", 0) or 0)
+                passed += int(summary.get("passed_rules", 0) or 0)
+
+            score = round(passed / applicable, 3) if applicable else 0.0
+            return {
+                "applicable_rules": applicable,
+                "passed_rules": passed,
+                "score": score,
+            }
+
+        week_plans = split_plan_into_week_plans(plan)
+
+        # Klassischer Modus (eine Woche)
+        if len(week_plans) <= 1:
+            report = {
+                "schema_version": "1.0",
+                "mode": "dual",
+                "mixed": evaluate_plan_for_diet(plan, rules_doc, "mixed"),
+                "ovo_lacto_vegetarian": evaluate_plan_for_diet(
+                    plan, rules_doc, "ovo_lacto_vegetarian"
+                ),
+            }
+            return report
+
+        # Monatsmodus (mehrere Wochen): Wochenreports + Monatsübersicht
+        weekly_reports = []
+        for wp in week_plans:
+            weekly_reports.append(
+                {
+                    "week_index": wp["week_index"],
+                    "week_label": wp["week_label"],
+                    "mixed": evaluate_plan_for_diet(wp["plan"], rules_doc, "mixed"),
+                    "ovo_lacto_vegetarian": evaluate_plan_for_diet(
+                        wp["plan"], rules_doc, "ovo_lacto_vegetarian"
+                    ),
+                }
+            )
+
+        monthly_summary = {
+            "weeks": len(weekly_reports),
+            "mixed": summarize_week_reports(weekly_reports, "mixed"),
+            "ovo_lacto_vegetarian": summarize_week_reports(
+                weekly_reports, "ovo_lacto_vegetarian"
+            ),
         }
-        return report
+
+        return {
+            "schema_version": "1.0",
+            "mode": "monthly_dual",
+            "monthly_summary": monthly_summary,
+            "weekly_reports": weekly_reports,
+        }
 
     # --- App-Start -------------------------------------------------------------
 
