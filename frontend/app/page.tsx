@@ -242,9 +242,6 @@ export default function Page() {
   const [preview, setPreview] = useState<PreviewResponse | null>(null);
   const [planDraft, setPlanDraft] = useState<PlanDoc | null>(null);
 
-  // UI: standardmäßig nur Problemfälle zeigen
-  const [showAllSelfCheckFields, setShowAllSelfCheckFields] = useState(false);
-
   // NEU: pro Menü können wir „alles anzeigen“ aktivieren, indem das Menü geöffnet wird.
   const [openMenus, setOpenMenus] = useState<Record<string, boolean>>({});
 
@@ -463,13 +460,13 @@ export default function Page() {
   }
 
   return (
-    <main className='min-h-screen w-screen box-border bg-white p-6 text-center font-sans text-slate-900'>
+    <main className='min-h-screen w-screen box-border bg-linear-to-b from-sky-50 via-white to-emerald-50/40 p-6 text-center font-sans text-slate-900'>
       <h1 className='m-0 text-[28px] font-black'>GENAU – Speiseplan Check</h1>
 
-      <section className='mx-auto mt-5 grid w-full max-w-300 gap-3 rounded-xl border border-slate-200 bg-white p-4 text-slate-900'>
+      <section className='mx-auto mt-5 grid w-full max-w-300 gap-3 rounded-xl border border-slate-200 bg-white/95 p-4 text-slate-900 shadow-soft backdrop-blur-sm'>
         {/* Step indicator + Navigation */}
         {step !== 'selfcheck' && (
-          <div className='flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 text-left'>
+          <div className='flex flex-wrap items-center justify-between gap-2 rounded-xl border border-sky-100 bg-sky-50/80 p-3 text-left'>
             <div className='text-sm font-extrabold'>
               Schritt:{' '}
               <span className='font-black'>
@@ -492,7 +489,7 @@ export default function Page() {
 
               <button
                 type='button'
-                className='cursor-pointer rounded-[10px] border border-slate-900 bg-slate-900 px-3 py-2 text-sm font-extrabold text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60'
+                className='cursor-pointer rounded-[10px] border border-teal-700 bg-teal-700 px-3 py-2 text-sm font-extrabold text-white hover:bg-teal-800 disabled:cursor-not-allowed disabled:opacity-60'
                 disabled={loading}
                 onClick={async () => {
                   setError(null);
@@ -563,8 +560,8 @@ export default function Page() {
               className={
                 'relative grid min-h-35 w-full cursor-pointer select-none place-items-center rounded-xl border-2 border-dashed p-4.5 text-center ' +
                 (isDragging
-                  ? 'border-slate-900 bg-slate-100'
-                  : 'border-slate-300 bg-slate-100')
+                  ? 'border-teal-600 bg-teal-50'
+                  : 'border-sky-200 bg-sky-50')
               }
             >
               {file && (
@@ -576,7 +573,7 @@ export default function Page() {
                     e.stopPropagation();
                     clearSelectedFile();
                   }}
-                  className='absolute right-2.5 top-2.5 grid h-7.5 w-7.5 cursor-pointer place-items-center rounded-full border border-slate-300 bg-white text-slate-900 hover:bg-slate-50'
+                  className='absolute right-2.5 top-2.5 grid h-7.5 w-7.5 cursor-pointer place-items-center rounded-full border border-sky-200 bg-white text-slate-900 hover:bg-sky-50'
                 >
                   <svg
                     width='16'
@@ -607,7 +604,7 @@ export default function Page() {
                 ) : (
                   <div
                     aria-hidden='true'
-                    className='grid h-11 w-11 place-items-center rounded-full border border-slate-300 bg-white text-slate-900'
+                    className='grid h-11 w-11 place-items-center rounded-full border border-sky-200 bg-white text-slate-900'
                   >
                     <svg
                       width='22'
@@ -667,23 +664,13 @@ export default function Page() {
               <div className='mt-2 text-xs text-slate-600'>
                 Items im Plan: <b>{draftItemCount}</b>
               </div>
-
-              <label className='mt-3 flex items-center gap-2 text-sm font-bold text-slate-700'>
-                <input
-                  type='checkbox'
-                  className='cursor-pointer'
-                  checked={showAllSelfCheckFields}
-                  onChange={(e) => setShowAllSelfCheckFields(e.target.checked)}
-                />
-                Alle Felder anzeigen
-              </label>
             </div>
 
             <div className='grid gap-3'>
               {(planDraft.days ?? []).map((day, dayIdx) => (
                 <div
                   key={dayIdx}
-                  className='rounded-xl border border-slate-200 bg-white p-3.5'
+                  className='rounded-xl border border-slate-200 bg-white/95 p-3.5 shadow-sm'
                 >
                   <div className='font-black'>
                     {day.weekday ?? `Tag ${dayIdx + 1}`}
@@ -696,7 +683,7 @@ export default function Page() {
                       ).length;
 
                       const menuKey = `${dayIdx}-${menuIdx}`;
-                      const isMenuOpen = openMenus[menuKey] ?? missingCount > 0;
+                      const isMenuOpen = openMenus[menuKey] ?? false;
 
                       // Wenn im Menü alles erkannt ist, zeigen wir statt „0 ohne Gruppe“
                       // eine kurze Übersicht, welche Gruppen vorkommen.
@@ -712,9 +699,8 @@ export default function Page() {
                         .map((g) => FOOD_GROUP_LABELS[g])
                         .join(' · ');
 
-                      // „Alle Felder“ gilt entweder global oder für dieses eine geöffnete Menü.
-                      const showAllForMenu =
-                        showAllSelfCheckFields || isMenuOpen;
+                      // Geöffnetes Menü zeigt alle Items, geschlossene Menüs bleiben kompakt.
+                      const showAllForMenu = isMenuOpen;
 
                       return (
                         <details
@@ -733,7 +719,7 @@ export default function Page() {
                             Menü: {menu.menu_type}{' '}
                             {missingCount > 0 ? (
                               <span className='ml-2 rounded-full border border-slate-200 bg-white px-2 py-0.5 text-xs font-black text-slate-700'>
-                                {missingCount} ohne Gruppe
+                                ⚠️ {missingCount} ohne Food-Gruppe
                               </span>
                             ) : (
                               recognizedGroupsLabel && (
@@ -901,11 +887,10 @@ export default function Page() {
                                 );
                               })}
 
-                            {!showAllSelfCheckFields && missingCount === 0 && (
+                            {missingCount === 0 && (
                               <div className='text-xs text-slate-500'>
                                 In diesem Menü wurde überall eine Gruppe
-                                erkannt. (Bei Bedarf oben „Alle Felder anzeigen“
-                                aktivieren.)
+                                erkannt.
                               </div>
                             )}
                           </div>
@@ -939,7 +924,7 @@ export default function Page() {
 
                   <button
                     type='button'
-                    className='cursor-pointer rounded-[10px] border border-slate-900 bg-slate-900 px-3.5 py-2 text-sm font-extrabold text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60'
+                    className='cursor-pointer rounded-[10px] border border-teal-700 bg-teal-700 px-3.5 py-2 text-sm font-extrabold text-white hover:bg-teal-800 disabled:cursor-not-allowed disabled:opacity-60'
                     disabled={loading}
                     onClick={analyzeCorrectedPlan}
                   >
@@ -973,7 +958,7 @@ export default function Page() {
 
                   <button
                     type='button'
-                    className='cursor-pointer rounded-[10px] border border-slate-900 bg-slate-900 px-3 py-2 text-sm font-extrabold text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60'
+                    className='cursor-pointer rounded-[10px] border border-teal-700 bg-teal-700 px-3 py-2 text-sm font-extrabold text-white hover:bg-teal-800 disabled:cursor-not-allowed disabled:opacity-60'
                     disabled={loading}
                     onClick={() => {
                       setError(null);
@@ -986,12 +971,12 @@ export default function Page() {
               </details>
             )}
 
-            <div className='grid grid-cols-2 gap-3'>
+            <div className='grid grid-cols-1 gap-3 md:grid-cols-2'>
               <ScoreCard title='Mischkost' rep={dual.mixed} />
               <ScoreCard title='Vegetarisch' rep={dual.ovo_lacto_vegetarian} />
             </div>
 
-            <div className='grid grid-cols-2 gap-3'>
+            <div className='grid grid-cols-1 gap-3 md:grid-cols-2'>
               <div>
                 <h2 className='text-lg font-black'>Regeln – Mischkost</h2>
                 <RulesList rep={dual.mixed} onlyFailed={false} />
