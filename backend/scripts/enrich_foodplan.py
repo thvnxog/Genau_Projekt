@@ -121,6 +121,19 @@ def normalize_text(s: str) -> str:
     return s
 
 
+def fold_umlauts(s: str) -> str:
+    """Erzeugt eine ASCII-nahe Vergleichsform (ä->ae, ö->oe, ü->ue, ß->ss)."""
+
+    if not s:
+        return ""
+    return (
+        s.replace("ä", "ae")
+        .replace("ö", "oe")
+        .replace("ü", "ue")
+        .replace("ß", "ss")
+    )
+
+
 def is_preparation_verb_token(token: str) -> bool:
     """Erkennt Zubereitungs-Verben/Partizipien wie "überbacken" oder "frittiert".
 
@@ -183,12 +196,50 @@ def token_matches_keyword(token: str, kw: str) -> bool:
 
     if not token or not kw:
         return False
-    if token == kw:
-        return True
-    if token.startswith(kw):
-        return True
-    if kw in token:
-        return True
+    token_variants = {token, fold_umlauts(token)}
+    kw_variants = {kw, fold_umlauts(kw)}
+
+    for tok in token_variants:
+        if not tok:
+            continue
+        for key in kw_variants:
+            if not key:
+                continue
+            if tok == key:
+                return True
+            if tok.startswith(key):
+                return True
+            if key in tok:
+                return True
+    return False
+
+
+def keyword_matches_text(raw_text: str, tokens: List[str], kw: str) -> bool:
+    """Prüft, ob ein Keyword im Item-Text matcht.
+
+    - Einzelwörter: token-basiert über token_matches_keyword
+    - Mehrwort-Keywords: direkter contains-Check im gesamten normalisierten Text
+    """
+
+    kw_norm = normalize_text(kw)
+    if not kw_norm:
+        return False
+
+    # Mehrwort-Keywords wie "alaska seelachs" funktionieren sonst nicht token-basiert.
+    if " " in kw_norm:
+        raw_norm = normalize_text(raw_text)
+        if kw_norm in raw_norm:
+            return True
+
+        raw_folded = fold_umlauts(raw_norm)
+        kw_folded = fold_umlauts(kw_norm)
+        if kw_folded and kw_folded in raw_folded:
+            return True
+        return False
+
+    for tok in tokens:
+        if token_matches_keyword(tok, kw_norm):
+            return True
     return False
 
 
@@ -298,7 +349,7 @@ class MatchResult:
     hits: int
 
 
-def score_keywords(tokens: List[str], keywords: List[str]) -> int:
+def score_keywords(raw_text: str, tokens: List[str], keywords: List[str]) -> int:
     """Zählt, wie viele Keywords in den Tokens "irgendwie" matchen.
 
     Wichtig:
@@ -307,10 +358,8 @@ def score_keywords(tokens: List[str], keywords: List[str]) -> int:
 
     hits = 0
     for kw in keywords:
-        for tok in tokens:
-            if token_matches_keyword(tok, kw):
-                hits += 1
-                break
+        if keyword_matches_text(raw_text, tokens, kw):
+            hits += 1
     return hits
 
 
@@ -334,7 +383,7 @@ def pick_best_group(raw_text: str, group_keywords: Dict[str, List[str]]) -> Matc
     for group, kws in group_keywords.items():
         if not kws:
             continue
-        hits = score_keywords(tokens, kws)
+        hits = score_keywords(raw_text, tokens, kws)
         if hits > best_hits:
             best_hits = hits
             best_key = group
@@ -355,7 +404,7 @@ def collect_tags(raw_text: str, tag_keywords: Dict[str, List[str]]) -> List[str]
     for tag, kws in tag_keywords.items():
         if not kws:
             continue
-        hits = score_keywords(tokens, kws)
+        hits = score_keywords(raw_text, tokens, kws)
         if hits > 0:
             tags.append(tag)
     return sorted(set(tags))

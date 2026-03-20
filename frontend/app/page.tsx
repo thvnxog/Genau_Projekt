@@ -259,6 +259,7 @@ export default function Page() {
 
   const [reportData, setReportData] = useState<AnalyzeResponse | null>(null);
   const [activeWeekIndex, setActiveWeekIndex] = useState(0);
+  const [selfCheckWeekIndex, setSelfCheckWeekIndex] = useState(0);
 
   // NEU: Self-check state
   const [preview, setPreview] = useState<PreviewResponse | null>(null);
@@ -285,6 +286,7 @@ export default function Page() {
     setPlanDraft(null);
     setError(null);
     setActiveWeekIndex(0);
+    setSelfCheckWeekIndex(0);
     setStep('upload');
     if (fileInputRef.current) fileInputRef.current.value = '';
   }
@@ -295,6 +297,7 @@ export default function Page() {
     setPreview(null);
     setPlanDraft(null);
     setActiveWeekIndex(0);
+    setSelfCheckWeekIndex(0);
 
     if (!file) {
       setError('Bitte eine Datei auswählen (.xlsx).');
@@ -441,6 +444,64 @@ export default function Page() {
     return n;
   }, [planDraft]);
 
+  const selfCheckWeeks = useMemo(() => {
+    const days = planDraft?.days ?? [];
+    const byWeek = new Map<number, string>();
+
+    for (const d of days) {
+      const idx = d.week_index ?? 0;
+      if (!byWeek.has(idx)) {
+        byWeek.set(idx, d.week_label || `Woche ${idx + 1}`);
+      }
+    }
+
+    if (byWeek.size === 0) {
+      byWeek.set(0, 'Woche 1');
+    }
+
+    return Array.from(byWeek.entries())
+      .map(([week_index, week_label]) => ({ week_index, week_label }))
+      .sort((a, b) => a.week_index - b.week_index);
+  }, [planDraft]);
+
+  const missingFoodGroupByWeek = useMemo(() => {
+    const days = planDraft?.days ?? [];
+    const counts = new Map<number, number>();
+
+    for (const d of days) {
+      const weekIdx = d.week_index ?? 0;
+      let weekMissing = counts.get(weekIdx) ?? 0;
+
+      for (const m of d.menus ?? []) {
+        for (const it of m.items ?? []) {
+          const hasGroup =
+            (Array.isArray(it.food_groups) && it.food_groups.length > 0) ||
+            Boolean(it.links?.food_group);
+          if (!hasGroup) weekMissing += 1;
+        }
+      }
+
+      counts.set(weekIdx, weekMissing);
+    }
+
+    return counts;
+  }, [planDraft]);
+
+  const normalizedSelfCheckWeekIndex = useMemo(() => {
+    const weekIndices = new Set(selfCheckWeeks.map((w) => w.week_index));
+    if (weekIndices.has(selfCheckWeekIndex)) return selfCheckWeekIndex;
+    return selfCheckWeeks[0]?.week_index ?? 0;
+  }, [selfCheckWeekIndex, selfCheckWeeks]);
+
+  const selfCheckDays = useMemo(() => {
+    const days = planDraft?.days ?? [];
+    return days
+      .map((day, dayIdx) => ({ day, dayIdx }))
+      .filter(
+        ({ day }) => (day.week_index ?? 0) === normalizedSelfCheckWeekIndex,
+      );
+  }, [planDraft, normalizedSelfCheckWeekIndex]);
+
   function toggleItemFoodGroup(
     dayIdx: number,
     menuIdx: number,
@@ -521,7 +582,10 @@ export default function Page() {
                 onClick={async () => {
                   setError(null);
                   if (step === 'upload') return startSelfCheck();
-                  if (step === 'report') setStep('selfcheck');
+                  if (step === 'report') {
+                    setSelfCheckWeekIndex(activeWeekIndex);
+                    setStep('selfcheck');
+                  }
                 }}
               >
                 {loading
@@ -720,10 +784,46 @@ export default function Page() {
               <div className='mt-2 text-xs text-slate-700'>
                 Items im Plan: <b>{draftItemCount}</b>
               </div>
+
+              {selfCheckWeeks.length > 1 && (
+                <div className='mt-3'>
+                  <div className='mb-1 text-xs font-bold text-slate-700'>
+                    Woche auswählen
+                  </div>
+                  <div className='flex flex-wrap justify-center gap-2'>
+                    {selfCheckWeeks.map((w) => {
+                      const weekMissing =
+                        missingFoodGroupByWeek.get(w.week_index) ?? 0;
+                      const hasMissing = weekMissing > 0;
+
+                      return (
+                        <button
+                          key={w.week_index}
+                          type='button'
+                          onClick={() => setSelfCheckWeekIndex(w.week_index)}
+                          className={`cursor-pointer rounded-full border px-3 py-1 text-xs font-bold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600 focus-visible:ring-offset-2 ${
+                            w.week_index === normalizedSelfCheckWeekIndex
+                              ? 'border-teal-700 bg-teal-700 text-white'
+                              : 'border-slate-300 bg-white text-slate-800 hover:bg-slate-50'
+                          }`}
+                          title={
+                            hasMissing
+                              ? `${weekMissing} Einträge ohne Gruppe in dieser Woche`
+                              : 'Alle Einträge dieser Woche haben eine Gruppe'
+                          }
+                        >
+                          {hasMissing ? '⚠️ ' : ''}
+                          {w.week_label || `Woche ${w.week_index + 1}`}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className='grid gap-3'>
-              {(planDraft.days ?? []).map((day, dayIdx) => (
+              {selfCheckDays.map(({ day, dayIdx }) => (
                 <div
                   key={dayIdx}
                   className='rounded-xl border border-slate-200 bg-white/95 p-3.5 shadow-sm'
@@ -1028,57 +1128,9 @@ export default function Page() {
             )}
 
             {reportData.mode === 'monthly_dual' && (
-              <div className='rounded-xl border border-sky-100 bg-sky-50/70 p-3 text-left text-slate-900'>
-                <div className='text-sm font-extrabold'>
-                  Monatsübersicht ({reportData.monthly_summary.weeks} Wochen)
-                </div>
-                <div className='mt-2 grid grid-cols-1 gap-2 md:grid-cols-2'>
-                  <div className='rounded-lg border border-slate-200 bg-white p-2'>
-                    <div className='text-xs font-bold text-slate-700'>
-                      Mischkost
-                    </div>
-                    <div className='text-sm font-extrabold text-slate-900'>
-                      {(reportData.monthly_summary.mixed.score * 100).toFixed(
-                        1,
-                      )}
-                      %
-                    </div>
-                    <div className='text-xs text-slate-700'>
-                      {reportData.monthly_summary.mixed.passed_rules}/
-                      {reportData.monthly_summary.mixed.applicable_rules} Regeln
-                    </div>
-                  </div>
-                  <div className='rounded-lg border border-slate-200 bg-white p-2'>
-                    <div className='text-xs font-bold text-slate-700'>
-                      Vegetarisch
-                    </div>
-                    <div className='text-sm font-extrabold text-slate-900'>
-                      {(
-                        reportData.monthly_summary.ovo_lacto_vegetarian.score *
-                        100
-                      ).toFixed(1)}
-                      %
-                    </div>
-                    <div className='text-xs text-slate-700'>
-                      {
-                        reportData.monthly_summary.ovo_lacto_vegetarian
-                          .passed_rules
-                      }
-                      /
-                      {
-                        reportData.monthly_summary.ovo_lacto_vegetarian
-                          .applicable_rules
-                      }{' '}
-                      Regeln
-                    </div>
-                  </div>
-                </div>
-
-                <div className='mt-3'>
-                  <div className='mb-1 text-xs font-bold text-slate-700'>
-                    Wochenansicht
-                  </div>
-                  <div className='flex flex-wrap gap-2'>
+              <>
+                <div className='rounded-xl border border-slate-200 bg-white p-3 text-left text-slate-900'>
+                  <div className='flex flex-wrap justify-center gap-2'>
                     {reportData.weekly_reports.map((w, idx) => (
                       <button
                         key={w.week_index}
@@ -1095,49 +1147,79 @@ export default function Page() {
                     ))}
                   </div>
                 </div>
-              </div>
-            )}
 
-            {(() => {
-              const active =
-                reportData.mode === 'monthly_dual'
-                  ? reportData.weekly_reports[
+                {(() => {
+                  const activeWeek =
+                    reportData.weekly_reports[
                       Math.min(
                         Math.max(activeWeekIndex, 0),
                         Math.max(0, reportData.weekly_reports.length - 1),
                       )
-                    ]
-                  : reportData;
+                    ];
 
-              return (
-                <>
-                  <div className='grid grid-cols-1 gap-3 md:grid-cols-2'>
-                    <ScoreCard title='Mischkost' rep={active.mixed} />
-                    <ScoreCard
-                      title='Vegetarisch'
-                      rep={active.ovo_lacto_vegetarian}
+                  return (
+                    <>
+                      <div className='grid grid-cols-1 gap-3 md:grid-cols-2'>
+                        <ScoreCard title='Mischkost' rep={activeWeek.mixed} />
+                        <ScoreCard
+                          title='Vegetarisch'
+                          rep={activeWeek.ovo_lacto_vegetarian}
+                        />
+                      </div>
+
+                      <div className='grid grid-cols-1 gap-3 md:grid-cols-2'>
+                        <div>
+                          <h2 className='text-lg font-black'>
+                            Regeln – Mischkost
+                          </h2>
+                          <RulesList
+                            rep={activeWeek.mixed}
+                            onlyFailed={false}
+                          />
+                        </div>
+
+                        <div>
+                          <h2 className='text-lg font-black'>
+                            Regeln – Vegetarisch
+                          </h2>
+                          <RulesList
+                            rep={activeWeek.ovo_lacto_vegetarian}
+                            onlyFailed={false}
+                          />
+                        </div>
+                      </div>
+                    </>
+                  );
+                })()}
+              </>
+            )}
+
+            {reportData.mode === 'dual' && (
+              <>
+                <div className='grid grid-cols-1 gap-3 md:grid-cols-2'>
+                  <ScoreCard title='Mischkost' rep={reportData.mixed} />
+                  <ScoreCard
+                    title='Vegetarisch'
+                    rep={reportData.ovo_lacto_vegetarian}
+                  />
+                </div>
+
+                <div className='grid grid-cols-1 gap-3 md:grid-cols-2'>
+                  <div>
+                    <h2 className='text-lg font-black'>Regeln – Mischkost</h2>
+                    <RulesList rep={reportData.mixed} onlyFailed={false} />
+                  </div>
+
+                  <div>
+                    <h2 className='text-lg font-black'>Regeln – Vegetarisch</h2>
+                    <RulesList
+                      rep={reportData.ovo_lacto_vegetarian}
+                      onlyFailed={false}
                     />
                   </div>
-
-                  <div className='grid grid-cols-1 gap-3 md:grid-cols-2'>
-                    <div>
-                      <h2 className='text-lg font-black'>Regeln – Mischkost</h2>
-                      <RulesList rep={active.mixed} onlyFailed={false} />
-                    </div>
-
-                    <div>
-                      <h2 className='text-lg font-black'>
-                        Regeln – Vegetarisch
-                      </h2>
-                      <RulesList
-                        rep={active.ovo_lacto_vegetarian}
-                        onlyFailed={false}
-                      />
-                    </div>
-                  </div>
-                </>
-              );
-            })()}
+                </div>
+              </>
+            )}
           </section>
         )}
       </section>

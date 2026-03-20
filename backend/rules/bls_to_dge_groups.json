@@ -4,7 +4,14 @@
     {
       "dge_food_group": "fruit",
       "match": {
-        "contains_any": ["apfel", "birne", "banane", "beere", "orange", "traube"]
+        "contains_any": [
+          "apfel",
+          "birne",
+          "banane",
+          "beere",
+          "orange",
+          "traube"
+        ]
       }
     },
     {
@@ -35,13 +42,28 @@
     {
       "dge_food_group": "grains_potatoes",
       "match": {
-        "contains_any": ["reis", "nudel", "brot", "hafer", "weizen", "kartoffel", "spaghetti"]
+        "contains_any": [
+          "reis",
+          "nudel",
+          "brot",
+          "hafer",
+          "weizen",
+          "kartoffel",
+          "spaghetti"
+        ]
       }
     },
     {
       "dge_food_group": "dairy",
       "match": {
-        "contains_any": ["milch", "joghurt", "quark", "käse", "mozzarella","pudding"]
+        "contains_any": [
+          "milch",
+          "joghurt",
+          "quark",
+          "käse",
+          "mozzarella",
+          "pudding"
+        ]
       }
     },
     {
@@ -64,6 +86,11 @@
       "dge_food_group": "fish",
       "match": {
         "contains_any": [
+          "fisch",
+          "fischstäbchen",
+          "fischstabchen",
+          "backfisch",
+          "schlemmerfilet",
           "lachs",
           "seelachs",
           "kabeljau",
@@ -79,13 +106,25 @@
     {
       "tag": "wholegrain",
       "match": {
-        "contains_any": ["vollkorn", "haferflocken", "dinkelvollkorn", "saatenbrot"]
+        "contains_any": [
+          "vollkorn",
+          "haferflocken",
+          "dinkelvollkorn",
+          "saatenbrot"
+        ]
       }
     },
     {
       "tag": "raw_veg",
       "match": {
-        "contains_any": ["rohkost", "salat", "gurke", "tomate", "möhrensticks", "sticks"]
+        "contains_any": [
+          "rohkost",
+          "salat",
+          "gurke",
+          "tomate",
+          "möhrensticks",
+          "sticks"
+        ]
       }
     },
     {
