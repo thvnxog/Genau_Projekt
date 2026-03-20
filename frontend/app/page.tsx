@@ -95,6 +95,20 @@ const TAG_LABELS: Record<RelevantTag, string> = {
   whole_fruit: 'Stückobst (kein Mus/Saft)',
 };
 
+// Styling für Food Groups (Icon + Farbe)
+const FOOD_GROUP_STYLES: Record<
+  Exclude<FoodGroup, ''>,
+  { icon: string; color: string; bg: string }
+> = {
+  grains_potatoes: { icon: '🌾', color: '#b45309', bg: '#fef3c7' },
+  vegetables: { icon: '🥦', color: '#15803d', bg: '#dcfce7' },
+  legumes: { icon: '🫘', color: '#7c2d12', bg: '#fed7aa' },
+  fruit: { icon: '🍎', color: '#991b1b', bg: '#fee2e2' },
+  dairy: { icon: '🥛', color: '#0c4a6e', bg: '#e0f2fe' },
+  meat: { icon: '🍖', color: '#7c2d12', bg: '#ffedd5' },
+  fish: { icon: '🐟', color: '#164e63', bg: '#cffafe' },
+};
+
 function toggleTag(list: string[] | undefined, tag: RelevantTag): string[] {
   const tags = Array.isArray(list) ? [...list] : [];
   if (tags.includes(tag)) return tags.filter((t) => t !== tag);
@@ -215,7 +229,7 @@ export default function Page() {
   // NEU: pro Menü können wir „alles anzeigen“ aktivieren, indem das Menü geöffnet wird.
   const [openMenus, setOpenMenus] = useState<Record<string, boolean>>({});
 
-  type Step = 'upload' | 'selfcheck' | 'report';
+  type Step = 'upload' | 'report' | 'selfcheck';
   const [step, setStep] = useState<Step>('upload');
 
   // Hilfsfunktion: nimmt die erste Datei aus einem Drop-Event.
@@ -289,7 +303,28 @@ export default function Page() {
 
       setPreview(data);
       setPlanDraft(structuredClone(data.plan));
-      setStep('selfcheck');
+
+      // Direkt einen ersten Report berechnen und anzeigen.
+      const analyzeRes = await fetch('/api/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ plan: data.plan }),
+      });
+
+      if (!analyzeRes.ok) {
+        const msg = await analyzeRes.text();
+        throw new Error(msg || `HTTP ${analyzeRes.status}`);
+      }
+
+      const report = (await analyzeRes.json()) as ReportDual;
+      if (!report || report.mode !== 'dual') {
+        throw new Error(
+          'Backend hat keinen dual-Report geliefert (erwarte mode="dual").',
+        );
+      }
+
+      setDual(report);
+      setStep('report');
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Unbekannter Fehler');
     } finally {
@@ -341,6 +376,23 @@ export default function Page() {
     for (const d of days) {
       for (const m of d.menus ?? []) {
         n += (m.items ?? []).length;
+      }
+    }
+    return n;
+  }, [planDraft]);
+
+  // Anzahl Items ohne erkannte Gruppe (über den ganzen Plan)
+  const missingFoodGroupCount = useMemo(() => {
+    const days = planDraft?.days ?? [];
+    let n = 0;
+    for (const d of days) {
+      for (const m of d.menus ?? []) {
+        for (const it of m.items ?? []) {
+          const hasGroup =
+            (Array.isArray(it.food_groups) && it.food_groups.length > 0) ||
+            Boolean(it.links?.food_group);
+          if (!hasGroup) n += 1;
+        }
       }
     }
     return n;
@@ -402,19 +454,18 @@ export default function Page() {
             <div className='text-sm font-extrabold'>
               Schritt:{' '}
               <span className='font-black'>
-                {step === 'upload' ? '1/3 Upload' : '3/3 Report'}
+                {step === 'upload' ? '1/3 Upload' : '2/3 Report'}
               </span>
             </div>
 
             <div className='flex flex-wrap gap-2'>
               <button
                 type='button'
-                className='rounded-[10px] border border-slate-300 bg-white px-3 py-2 text-sm font-extrabold text-slate-900 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60'
+                className='cursor-pointer rounded-[10px] border border-slate-300 bg-white px-3 py-2 text-sm font-extrabold text-slate-900 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60'
                 disabled={step === 'upload' || loading}
                 onClick={() => {
                   setError(null);
-                  // hier sind wir nur in 'upload' oder 'report'
-                  if (step === 'report') setStep('selfcheck');
+                  if (step === 'report') setStep('upload');
                 }}
               >
                 Zurück
@@ -422,14 +473,19 @@ export default function Page() {
 
               <button
                 type='button'
-                className='rounded-[10px] border border-slate-900 bg-slate-900 px-3 py-2 text-sm font-extrabold text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60'
+                className='cursor-pointer rounded-[10px] border border-slate-900 bg-slate-900 px-3 py-2 text-sm font-extrabold text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60'
                 disabled={loading}
                 onClick={async () => {
                   setError(null);
                   if (step === 'upload') return startSelfCheck();
+                  if (step === 'report') setStep('selfcheck');
                 }}
               >
-                {loading ? 'Lade…' : step === 'upload' ? 'Weiter' : 'Fertig'}
+                {loading
+                  ? 'Lade…'
+                  : step === 'upload'
+                    ? 'Weiter'
+                    : 'Weiter zum Selbstcheck'}
               </button>
             </div>
           </div>
@@ -501,7 +557,7 @@ export default function Page() {
                     e.stopPropagation();
                     clearSelectedFile();
                   }}
-                  className='absolute right-2.5 top-2.5 grid h-7.5 w-7.5 place-items-center rounded-full border border-slate-300 bg-white text-slate-900 hover:bg-slate-50'
+                  className='absolute right-2.5 top-2.5 grid h-7.5 w-7.5 cursor-pointer place-items-center rounded-full border border-slate-300 bg-white text-slate-900 hover:bg-slate-50'
                 >
                   <svg
                     width='16'
@@ -596,6 +652,7 @@ export default function Page() {
               <label className='mt-3 flex items-center gap-2 text-sm font-bold text-slate-700'>
                 <input
                   type='checkbox'
+                  className='cursor-pointer'
                   checked={showAllSelfCheckFields}
                   onChange={(e) => setShowAllSelfCheckFields(e.target.checked)}
                 />
@@ -684,130 +741,144 @@ export default function Page() {
                                 if (!showGroups) return null;
 
                                 return (
-                                  <div
+                                  <details
                                     key={itemIdx}
-                                    className='rounded-lg border border-slate-200 bg-white p-2.5'
+                                    className='rounded-lg border border-slate-200 bg-white'
                                   >
-                                    <div className='text-sm font-bold'>
+                                    <summary className='cursor-pointer select-none p-2.5 text-sm font-bold flex items-center gap-2'>
+                                      <span>
+                                        {recognizedGroup ? '✓' : '⚠️'}
+                                      </span>
                                       {it.raw_text}
-                                    </div>
+                                    </summary>
 
-                                    <div className='mt-2 grid grid-cols-1 gap-2 md:grid-cols-2 md:items-start'>
-                                      <label className='text-xs font-bold text-slate-700'>
-                                        Lebensmittelgruppen
-                                        <div className='mt-0.5 text-[11px] font-normal text-slate-600'>
-                                          Du kannst mehrere auswählen. Alle
-                                          ausgewählten Gruppen fließen in die
-                                          Auswertung ein.
+                                    <div className='border-t border-slate-200 p-3 space-y-4'>
+                                      {/* Food Groups Section */}
+                                      <div>
+                                        <div className='text-xs font-bold text-slate-700 mb-2'>
+                                          Lebensmittelgruppen
                                         </div>
-                                      </label>
-
-                                      <div className='flex flex-wrap gap-2'>
-                                        {(
-                                          FOOD_GROUPS.filter(
-                                            Boolean,
-                                          ) as Exclude<FoodGroup, ''>[]
-                                        ).map((g) => (
-                                          <label
-                                            key={g}
-                                            className='flex items-center gap-1 rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-xs'
-                                            onClick={(e) => {
-                                              // Klicks auf Label sollen nicht das <details> (Menü) toggeln.
-                                              e.stopPropagation();
-                                            }}
-                                          >
-                                            <input
-                                              type='checkbox'
-                                              checked={(
-                                                it.food_groups ??
-                                                [it.links?.food_group].filter(
-                                                  Boolean,
-                                                )
-                                              ).includes(g)}
-                                              onChange={() =>
-                                                toggleItemFoodGroup(
-                                                  dayIdx,
-                                                  menuIdx,
-                                                  itemIdx,
-                                                  g,
-                                                )
-                                              }
-                                              onClick={(e) => {
-                                                // Klicks auf Checkbox sollen nicht das <details> (Menü) toggeln.
-                                                e.stopPropagation();
-                                              }}
-                                            />
-                                            <span>{FOOD_GROUP_LABELS[g]}</span>
-                                          </label>
-                                        ))}
-                                      </div>
-                                    </div>
-
-                                    {/* Tags (optional) */}
-                                    <div className='mt-2.5 rounded-lg border border-indigo-100 bg-indigo-50/60 p-2.5'>
-                                      <div className='grid grid-cols-1 gap-2 md:grid-cols-2 md:items-start'>
-                                        <label className='text-xs font-bold text-slate-700'>
-                                          Zusätze / Tags
-                                          <div className='mt-0.5 text-[11px] font-normal text-slate-600'>
-                                            Optional – nur falls im Speiseplan
-                                            nicht eindeutig erkennbar.
-                                          </div>
-                                        </label>
+                                        <div className='text-[11px] font-normal text-slate-600 mb-3'>
+                                          Wähle alle zutreffenden Gruppen aus.
+                                        </div>
 
                                         <div className='flex flex-wrap gap-2'>
                                           {(
-                                            RELEVANT_TAGS as readonly RelevantTag[]
-                                          ).map((t) => (
-                                            <label
-                                              key={t}
-                                              className='flex items-center gap-1 rounded-md border border-indigo-200 bg-white px-2 py-1 text-xs text-slate-800'
-                                              onClick={(e) => {
-                                                // Klicks auf Tag-Label sollen nicht das <details> (Menü) toggeln.
-                                                e.stopPropagation();
-                                              }}
-                                            >
-                                              <input
-                                                type='checkbox'
-                                                checked={(
-                                                  it.tags ?? []
-                                                ).includes(t)}
-                                                onChange={() =>
-                                                  toggleItemTag(
+                                            FOOD_GROUPS.filter(
+                                              Boolean,
+                                            ) as Exclude<FoodGroup, ''>[]
+                                          ).map((g) => {
+                                            const isSelected = (
+                                              it.food_groups ??
+                                              [it.links?.food_group].filter(
+                                                Boolean,
+                                              )
+                                            ).includes(g);
+                                            const style = FOOD_GROUP_STYLES[g];
+
+                                            return (
+                                              <button
+                                                key={g}
+                                                type='button'
+                                                onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  toggleItemFoodGroup(
                                                     dayIdx,
                                                     menuIdx,
                                                     itemIdx,
-                                                    t,
-                                                  )
-                                                }
-                                                onClick={(e) => {
-                                                  e.stopPropagation();
+                                                    g,
+                                                  );
                                                 }}
-                                              />
-                                              <span>{TAG_LABELS[t]}</span>
-                                            </label>
-                                          ))}
+                                                className={`cursor-pointer rounded-full px-3 py-1.5 text-xs font-semibold transition-all ${
+                                                  isSelected
+                                                    ? 'ring-2 ring-offset-1 ring-slate-400'
+                                                    : 'opacity-70 hover:opacity-100'
+                                                }`}
+                                                style={{
+                                                  backgroundColor: style.bg,
+                                                  color: style.color,
+                                                }}
+                                              >
+                                                <span className='mr-1'>
+                                                  {style.icon}
+                                                </span>
+                                                {FOOD_GROUP_LABELS[g]}
+                                              </button>
+                                            );
+                                          })}
                                         </div>
                                       </div>
+
+                                      {/* Tags Section (Collapsible) */}
+                                      <details className='group'>
+                                        <summary className='cursor-pointer select-none text-xs font-bold text-slate-700 flex items-center gap-2 hover:text-slate-900'>
+                                          <span className='transition-transform group-open:rotate-90'>
+                                            ▶
+                                          </span>
+                                          Zusätze / Tags (optional)
+                                        </summary>
+
+                                        <div className='mt-3 space-y-2 pl-4 border-l-2 border-slate-200'>
+                                          <div className='text-[11px] font-normal text-slate-600'>
+                                            Falls im Speiseplan nicht eindeutig
+                                            erkennbar.
+                                          </div>
+
+                                          <div className='flex flex-wrap gap-2'>
+                                            {(
+                                              RELEVANT_TAGS as readonly RelevantTag[]
+                                            ).map((t) => {
+                                              const isSelected = (
+                                                it.tags ?? []
+                                              ).includes(t);
+
+                                              return (
+                                                <button
+                                                  key={t}
+                                                  type='button'
+                                                  onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    toggleItemTag(
+                                                      dayIdx,
+                                                      menuIdx,
+                                                      itemIdx,
+                                                      t,
+                                                    );
+                                                  }}
+                                                  className={`cursor-pointer rounded-full px-2.5 py-1 text-xs font-medium transition-all ${
+                                                    isSelected
+                                                      ? 'bg-indigo-600 text-white'
+                                                      : 'bg-indigo-100 text-indigo-700 hover:bg-indigo-200'
+                                                  }`}
+                                                >
+                                                  {TAG_LABELS[t]}
+                                                </button>
+                                              );
+                                            })}
+                                          </div>
+                                        </div>
+                                      </details>
+
+                                      {/* Summary */}
+                                      <div className='mt-2 text-[11px] text-slate-500 pt-2 border-t border-slate-100'>
+                                        Gruppen (für Auswertung):{' '}
+                                        <b>
+                                          {(() => {
+                                            const list = (it.food_groups ??
+                                              [it.links?.food_group].filter(
+                                                Boolean,
+                                              )) as Exclude<FoodGroup, ''>[];
+
+                                            if (!list.length) return '—';
+
+                                            return list
+                                              .map((g) => FOOD_GROUP_LABELS[g])
+                                              .join(' · ');
+                                          })()}
+                                        </b>
+                                      </div>
                                     </div>
-
-                                    <div className='mt-2 text-[11px] text-slate-500'>
-                                      Gruppen (für Auswertung):{' '}
-                                      <b>
-                                        {(() => {
-                                          const list = (it.food_groups ??
-                                            [it.links?.food_group].filter(
-                                              Boolean,
-                                            )) as Exclude<FoodGroup, ''>[];
-
-                                          if (!list.length) return '—';
-
-                                          return list
-                                            .map((g) => FOOD_GROUP_LABELS[g])
-                                            .join(' · ');
-                                        })()}
-                                      </b>
-                                    </div>
-                                  </div>
+                                  </details>
                                 );
                               })}
 
@@ -831,29 +902,29 @@ export default function Page() {
             <div className='sticky bottom-0 z-10 -mx-4 mt-2 border-t border-slate-200 bg-white/90 p-3 backdrop-blur'>
               <div className='flex flex-wrap items-center justify-between gap-2'>
                 <div className='text-xs text-slate-600'>
-                  Schritt 2/3 – Selbstcheck
+                  Schritt 3/3 – Selbstcheck
                 </div>
 
                 <div className='flex flex-wrap gap-2'>
                   <button
                     type='button'
-                    className='rounded-[10px] border border-slate-300 bg-white px-3 py-2 text-sm font-extrabold text-slate-900 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60'
+                    className='cursor-pointer rounded-[10px] border border-slate-300 bg-white px-3 py-2 text-sm font-extrabold text-slate-900 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60'
                     disabled={loading}
                     onClick={() => {
                       setError(null);
-                      setStep('upload');
+                      setStep('report');
                     }}
                   >
-                    Zurück
+                    Zurück zum Report
                   </button>
 
                   <button
                     type='button'
-                    className='rounded-[10px] border border-slate-900 bg-slate-900 px-3.5 py-2 text-sm font-extrabold text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60'
+                    className='cursor-pointer rounded-[10px] border border-slate-900 bg-slate-900 px-3.5 py-2 text-sm font-extrabold text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60'
                     disabled={loading}
                     onClick={analyzeCorrectedPlan}
                   >
-                    {loading ? 'Berechne…' : 'Report berechnen'}
+                    {loading ? 'Berechne…' : 'Report aktualisieren'}
                   </button>
                 </div>
               </div>
@@ -864,6 +935,38 @@ export default function Page() {
         {/* STEP 3: REPORT */}
         {step === 'report' && dual && (
           <section className='grid gap-4.5'>
+            {missingFoodGroupCount > 0 && (
+              <details className='rounded-xl border border-amber-200 bg-amber-50 p-3 text-left text-slate-900'>
+                <summary className='cursor-pointer select-none font-extrabold flex items-center gap-2'>
+                  <span className='text-lg'>⚠️</span>
+                  <span>
+                    Hinweis – {missingFoodGroupCount} Gerichte ohne Zuordnung
+                  </span>
+                </summary>
+
+                <div className='mt-3 text-sm text-slate-700'>
+                  <div className='mb-2'>
+                    Für diese {missingFoodGroupCount} Gerichte konnte keine
+                    passende Food-Group erkannt werden. Du kannst die
+                    Zuordnungen im Selbstcheck ergänzen und den Report danach
+                    neu berechnen.
+                  </div>
+
+                  <button
+                    type='button'
+                    className='cursor-pointer rounded-[10px] border border-slate-900 bg-slate-900 px-3 py-2 text-sm font-extrabold text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60'
+                    disabled={loading}
+                    onClick={() => {
+                      setError(null);
+                      setStep('selfcheck');
+                    }}
+                  >
+                    Jetzt überarbeiten
+                  </button>
+                </div>
+              </details>
+            )}
+
             <div className='grid grid-cols-2 gap-3'>
               <ScoreCard title='Mischkost' rep={dual.mixed} />
               <ScoreCard title='Vegetarisch' rep={dual.ovo_lacto_vegetarian} />

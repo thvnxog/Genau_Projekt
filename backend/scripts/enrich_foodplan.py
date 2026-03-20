@@ -77,6 +77,29 @@ STOPWORDS = {
     "bio",
 }
 
+# Typische Zubereitungs-Verbstämme, die im Gerichtsnamen keine Food Group bedeuten.
+PREPARATION_VERB_STEMS = {
+    "back",
+    "brat",
+    "fritt",
+    "grill",
+    "dunst",
+    "duenst",
+    "blanch",
+    "roest",
+    "röst",
+    "gratin",
+    "panier",
+    "pochier",
+    "raeucher",
+    "räucher",
+    "ferment",
+    "schmor",
+    "marinier",
+    "wuerz",
+    "würz",
+}
+
 
 def normalize_text(s: str) -> str:
     """Normalisiert Eingabetext für robustes Matching.
@@ -98,6 +121,32 @@ def normalize_text(s: str) -> str:
     return s
 
 
+def is_preparation_verb_token(token: str) -> bool:
+    """Erkennt Zubereitungs-Verben/Partizipien wie "überbacken" oder "frittiert".
+
+    Diese Wörter beschreiben die Zubereitung, nicht die Lebensmittelgruppe.
+    """
+
+    if not token:
+        return False
+
+    t = token.strip().lower()
+    if not t:
+        return False
+
+    # Häufige Präfixe in Partizip-/Ableitungsformen abtrennen.
+    for prefix in ("über", "ueber", "uber", "ge"):
+        if t.startswith(prefix) and len(t) > len(prefix) + 2:
+            t = t[len(prefix) :]
+            break
+
+    for stem in PREPARATION_VERB_STEMS:
+        if t.startswith(stem):
+            return True
+
+    return False
+
+
 def tokenize(s: str) -> List[str]:
     """Zerlegt Text in Tokens.
 
@@ -116,6 +165,8 @@ def tokenize(s: str) -> List[str]:
         if not t:
             continue
         if t in STOPWORDS:
+            continue
+        if is_preparation_verb_token(t):
             continue
         tokens.append(t)
     return tokens

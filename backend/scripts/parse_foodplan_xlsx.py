@@ -24,6 +24,24 @@ import pandas as pd
 
 DAYS = {"montag", "dienstag", "mittwoch", "donnerstag", "freitag"}
 
+PREPARATION_FRAGMENT_STEMS = {
+    "back",
+    "brat",
+    "fritt",
+    "grill",
+    "gratin",
+    "panier",
+    "pochier",
+    "schmor",
+    "duenst",
+    "dünst",
+    "raeucher",
+    "räucher",
+    "marinier",
+    "wuerz",
+    "würz",
+}
+
 
 def norm_cell(x) -> Optional[str]:
     """Excel-Zellen robust in String/None wandeln."""
@@ -59,6 +77,42 @@ def join_hyphen(prev: str, curr: str) -> str:
     return prev + " " + curr
 
 
+def is_preparation_fragment(text: Optional[str]) -> bool:
+    """True, wenn eine Zeile nur eine Zubereitungsangabe enthält.
+
+    Beispiele:
+    - "überbacken"
+    - "frittiert"
+    - "gegrillt"
+    """
+
+    if not text:
+        return False
+
+    s = str(text).strip().lower()
+    if not s:
+        return False
+
+    tokens = [t for t in re.split(r"[^a-z0-9äöüß]+", s, flags=re.IGNORECASE) if t]
+    if not tokens:
+        return False
+
+    def normalize_stem_token(tok: str) -> str:
+        t = tok
+        for prefix in ("über", "ueber", "uber", "ge"):
+            if t.startswith(prefix) and len(t) > len(prefix) + 2:
+                t = t[len(prefix):]
+                break
+        return t
+
+    for tok in tokens:
+        t = normalize_stem_token(tok)
+        if not any(t.startswith(stem) for stem in PREPARATION_FRAGMENT_STEMS):
+            return False
+
+    return True
+
+
 def parse_block(block_df: pd.DataFrame, name_col: int, amount_col: int, notes_col: int) -> List[dict]:
     """
     Liest einen Block (z.B. Mischkost) innerhalb eines Tages aus.
@@ -79,6 +133,14 @@ def parse_block(block_df: pd.DataFrame, name_col: int, amount_col: int, notes_co
         # Fortsetzung ohne neue Portion/Notes (z.B. durch Zeilenumbruch)
         if name and current and not amount and not notes:
             current["raw_text"] = join_hyphen(current["raw_text"], name)
+            continue
+
+        # Reine Zubereitungszeile (z.B. "überbacken") an vorheriges Gericht anhängen,
+        # auch wenn die Excel-Zeile nicht perfekt leer in den anderen Spalten ist.
+        if name and current and is_preparation_fragment(name):
+            current["raw_text"] = join_hyphen(current["raw_text"], name)
+            if notes:
+                current["notes"].append(notes)
             continue
 
         # neuer Eintrag
