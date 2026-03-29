@@ -25,6 +25,45 @@ Letzte Aktualisierung: 2026-03-29
 - [ ] Regelstrategie festlegen: `min`, `max`, oder Bereich (`min` + `max`) pro Kategorie.
 - [ ] Regeln in `backend/rules/dge_lunch_rules.json` als `*_grams` ergaenzen.
 - [ ] Optional: 4-Tage-Variante mit skalierten Schwellen dokumentieren.
+- [ ] Schaetzverfahren (nur Gesamtgewicht pro Gericht) fachlich freigeben.
+
+## Arbeitsvorschlag: Schaetzung bei nur Gesamtgewicht pro Gericht
+
+Ausgangslage:
+
+- Nutzer geben teilweise nur ein Gesamtgewicht fuer das ganze Gericht an (z. B. 500 g).
+- Einzelmengen je Komponente (Gemuese, Staerke, Protein, Fett) fehlen.
+
+Vorschlag fuer die Reihenfolge der Datenqualitaet:
+
+1. Rezeptbasiert (beste Qualitaet): bekannte Mengen je Komponente.
+2. Profilbasiert (mittlere Qualitaet): feste Verteilprofile je Gerichtstyp.
+3. Keyword-Fallback (niedrige Qualitaet): grobe Verteilung nur aus Gerichtsname/Tags.
+
+Rechenprinzip:
+
+- geschaetzte_gramm_je_gruppe = gesamtgewicht_gericht \* anteil_der_gruppe
+- Beispiel: 500 g Gesamtgewicht, 40 % Gemuese -> 200 g Gemuese.
+
+Wichtige Grenzen:
+
+- Es gibt in der Praxis keine allgemein verbindliche Einzelregel, die aus nur einem Gesamtgewicht exakte DGE-Gruppenmengen erzeugt.
+- Die Methode ist eine nachvollziehbare Naeherung, keine exakte Bilanz.
+- Ergebnisse muessen im Report als geschaetzt gekennzeichnet werden.
+
+Empfehlung fuer die Umsetzung im Projekt:
+
+- Jedes Ergebnis mit Herkunft markieren: `recipe`, `profile`, `keyword_fallback`.
+- Zusaetzlich ein Unsicherheitslevel speichern: `hoch`, `mittel`, `niedrig`.
+- Regeln optional zweistufig bewerten:
+  - hart bei `recipe`
+  - weich/hinweisbasiert bei `profile` und `keyword_fallback`
+
+Offen zur Bestaetigung im naechsten Termin:
+
+- [ ] Ist dieses Schaetzverfahren als Zwischenloesung in Ordnung?
+- [ ] Duerfen wir dafuer Standardprofile je Gerichtstyp definieren?
+- [ ] Soll bei unsicherer Schaetzung nur gewarnt statt durchgefallen werden?
 
 ## Entwurf: Gramm-Sollwerte aus Tabelle (pro 5 Verpflegungstage)
 
