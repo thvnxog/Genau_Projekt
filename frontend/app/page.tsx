@@ -4,6 +4,7 @@ import React, { useMemo, useRef, useState } from 'react';
 import { StepNavigation } from './components/navigation/StepNavigation';
 import { ReportSection } from './components/report/ReportSection';
 import { SelfCheckSection } from './components/selfcheck/SelfCheckSection';
+import { LoadingSpinner } from './components/ui/LoadingSpinner';
 import { UploadSection } from './components/upload/UploadSection';
 import {
   toggleFoodGroup,
@@ -321,6 +322,17 @@ export default function Page() {
       <h1 className='m-0 text-[28px] font-black'>GENAU – Speiseplan Check</h1>
 
       <section className='mx-auto mt-5 grid w-full max-w-300 gap-3 rounded-xl border border-slate-200 bg-white p-4 text-slate-900'>
+        {loading && (
+          <div
+            role='status'
+            aria-live='polite'
+            className='flex items-center gap-2 rounded-xl border border-teal-200 bg-teal-50 px-3 py-2 text-left text-sm font-bold text-teal-900'
+          >
+            <LoadingSpinner size='md' className='text-teal-700' />
+            Daten werden geladen...
+          </div>
+        )}
+
         {/* Step indicator + Navigation */}
         {step !== 'selfcheck' && (
           <StepNavigation

@@ -1,4 +1,5 @@
 import React from 'react';
+import { LoadingSpinner } from '../ui/LoadingSpinner';
 
 import {
   FOOD_GROUP_LABELS,
@@ -356,7 +357,14 @@ export function SelfCheckSection({
               disabled={loading}
               onClick={onAnalyze}
             >
-              {loading ? 'Berechne…' : 'Report aktualisieren'}
+              {loading ? (
+                <span className='inline-flex items-center gap-2'>
+                  <LoadingSpinner className='text-white' />
+                  Berechne...
+                </span>
+              ) : (
+                'Report aktualisieren'
+              )}
             </button>
           </div>
         </div>

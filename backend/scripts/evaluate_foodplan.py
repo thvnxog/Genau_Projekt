@@ -113,15 +113,23 @@ def iter_items(plan: dict):
 # -----------------------------
 
 def collect_counts_and_evidence(plan: dict, selected_diet: str) -> Tuple[
-    Dict[str, int], Dict[str, int], Dict[str, List[dict]], Dict[str, List[dict]]
+    Dict[str, int],
+    Dict[str, int],
+    Dict[str, float],
+    Dict[str, float],
+    Dict[str, List[dict]],
+    Dict[str, List[dict]],
 ]:
     """Aggregiert Counts und Evidence für eine Diet.
 
-    Counts:
+        Counts:
     - `group_counts[group]`: wie oft kam `food_group` vor?
-      Neu: wenn `item.food_groups` (Liste) vorhanden ist, zählen wir jede Gruppe daraus.
+      Wenn `item.food_groups` (Liste) vorhanden ist, zählen wir jede Gruppe daraus.
       Fallback bleibt `item.links.food_group`.
     - `tag_counts[tag]`:     wie oft kam ein Tag in `item.tags` vor?
+        - `group_grams[group]`:   Summe Portionen in Gramm pro Foodgroup
+            Hinweis: Flüssigkeiten in `ml` werden 1:1 als Gramm mitgezählt.
+        - `tag_grams[tag]`:       Summe Portionen in Gramm pro Tag
 
     Evidence:
     - Für Debug/Erklärbarkeit sammeln wir Beispiel-Items (abgeschnitten auf später max. 10).
@@ -131,6 +139,8 @@ def collect_counts_and_evidence(plan: dict, selected_diet: str) -> Tuple[
 
     group_counts: Dict[str, int] = {}
     tag_counts: Dict[str, int] = {}
+    group_grams: Dict[str, float] = {}
+    tag_grams: Dict[str, float] = {}
     evidence_groups: Dict[str, List[dict]] = {}
     evidence_tags: Dict[str, List[dict]] = {}
 
@@ -167,7 +177,28 @@ def collect_counts_and_evidence(plan: dict, selected_diet: str) -> Tuple[
                 {"weekday": weekday, "menu_type": menu_type, "raw_text": raw_text}
             )
 
-    return group_counts, tag_counts, evidence_groups, evidence_tags
+        # --- Portionsmengen aggregieren ----------------------------------------
+        portion = item.get("portion") or {}
+        amount_value = portion.get("value")
+        amount_unit = (portion.get("unit") or "").strip().lower()
+
+        if isinstance(amount_value, (int, float)) and amount_unit in {"g", "ml"}:
+            value = float(amount_value)
+
+            # Vereinheitlicht: ml wird wie g behandelt (1:1), damit alle Regeln in Gramm arbeiten.
+            for group in groups_to_count:
+                group_grams[group] = group_grams.get(group, 0.0) + value
+            for t in tags:
+                tag_grams[t] = tag_grams.get(t, 0.0) + value
+
+    return (
+        group_counts,
+        tag_counts,
+        group_grams,
+        tag_grams,
+        evidence_groups,
+        evidence_tags,
+    )
 
 
 # -----------------------------
@@ -189,7 +220,7 @@ def rule_applies(rule: dict, selected_diet: str) -> bool:
     return d == selected_diet
 
 
-def evaluate_operator(actual: int, operator: str, threshold: int) -> bool:
+def evaluate_operator(actual: float, operator: str, threshold: float) -> bool:
     """Wendet den Operator einer Regel an (min/max/equals)."""
 
     if operator == "min":
@@ -215,6 +246,8 @@ def build_rule_result(
     selected_diet: str,
     group_counts: dict,
     tag_counts: dict,
+    group_grams: dict,
+    tag_grams: dict,
     evidence_groups: dict,
     evidence_tags: dict,
 ) -> dict:
@@ -229,23 +262,31 @@ def build_rule_result(
     """
 
     target = rule.get("target") or {}
-    count_by = target.get("count_by")  # "food_group" oder "tag"
+    count_by = target.get("count_by")  # "food_group", "tag", "food_group_grams", ...
     value = target.get("value")
     values = as_list(value)
 
     operator = rule.get("operator")
-    threshold = int(rule.get("threshold", 0))
+    threshold = float(rule.get("threshold", 0))
 
-    actual = 0
+    actual = 0.0
     evidence: List[dict] = []
 
     if count_by == "food_group":
         for v in values:
-            actual += int(group_counts.get(v, 0))
+            actual += float(group_counts.get(v, 0))
             evidence.extend((evidence_groups.get(v) or [])[:10])
     elif count_by == "tag":
         for v in values:
-            actual += int(tag_counts.get(v, 0))
+            actual += float(tag_counts.get(v, 0))
+            evidence.extend((evidence_tags.get(v) or [])[:10])
+    elif count_by == "food_group_grams":
+        for v in values:
+            actual += float(group_grams.get(v, 0.0))
+            evidence.extend((evidence_groups.get(v) or [])[:10])
+    elif count_by == "tag_grams":
+        for v in values:
+            actual += float(tag_grams.get(v, 0.0))
             evidence.extend((evidence_tags.get(v) or [])[:10])
     else:
         raise ValueError(f"Unsupported target.count_by: {count_by}")
@@ -271,7 +312,7 @@ def build_rule_result(
         "operator": operator,
         "threshold": threshold,
         "expected": expected_text,
-        "actual": actual,
+        "actual": round(actual, 2),
         "passed": passed,
         "notes": rule.get("notes"),
         "evidence_sample": evidence[:10],
@@ -281,9 +322,14 @@ def build_rule_result(
 def evaluate_plan_for_diet(plan: dict, rules_doc: dict, selected_diet: str) -> dict:
     """Erzeugt den Report für eine Diet (mixed oder ovo_lacto_vegetarian)."""
 
-    group_counts, tag_counts, evidence_groups, evidence_tags = collect_counts_and_evidence(
-        plan, selected_diet
-    )
+    (
+        group_counts,
+        tag_counts,
+        group_grams,
+        tag_grams,
+        evidence_groups,
+        evidence_tags,
+    ) = collect_counts_and_evidence(plan, selected_diet)
 
     rule_results: List[dict] = []
     applicable = 0
@@ -292,7 +338,14 @@ def evaluate_plan_for_diet(plan: dict, rules_doc: dict, selected_diet: str) -> d
     # Regeln durchlaufen und nacheinander bewerten
     for rule in rules_doc.get("rules", []) or []:
         res = build_rule_result(
-            rule, selected_diet, group_counts, tag_counts, evidence_groups, evidence_tags
+            rule,
+            selected_diet,
+            group_counts,
+            tag_counts,
+            group_grams,
+            tag_grams,
+            evidence_groups,
+            evidence_tags,
         )
 
         # Score nur aus Regeln berechnen, die für diese Diet gelten
@@ -315,7 +368,12 @@ def evaluate_plan_for_diet(plan: dict, rules_doc: dict, selected_diet: str) -> d
             "passed_rules": passed,
             "score": score,
         },
-        "counts": {"food_groups": group_counts, "tags": tag_counts},
+        "counts": {
+            "food_groups": group_counts,
+            "tags": tag_counts,
+            "food_groups_grams": {k: round(v, 2) for k, v in group_grams.items()},
+            "tags_grams": {k: round(v, 2) for k, v in tag_grams.items()},
+        },
         "rules": rule_results,
     }
 

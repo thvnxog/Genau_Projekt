@@ -150,16 +150,35 @@ export function UploadSection({
         </div>
       </div>
 
-      <div className='text-left text-xs text-slate-700'>
-        Vorlage nötig?{' '}
-        <a
-          href='/Speiseplan_Template.xlsx'
-          download
-          className='font-bold text-slate-900 underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600 focus-visible:ring-offset-2'
-        >
-          Template herunterladen
-        </a>
-        .
+      <div className='rounded-xl border border-slate-200 bg-slate-50 p-3 text-left'>
+        <div className='text-sm font-extrabold text-slate-900'>
+          Vorlagen herunterladen
+        </div>
+
+        <div className='mt-2 flex flex-wrap gap-2'>
+          <a
+            href='/1_Wochen_Plan.xlsx'
+            download
+            className='inline-flex items-center rounded-full border border-slate-300 bg-white px-3 py-1.5 text-xs font-bold text-slate-900 shadow-sm hover:border-slate-400 hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600 focus-visible:ring-offset-2'
+          >
+            1-Wochen-Plan
+          </a>
+
+          <a
+            href='/Speiseplan_Template_4T.xlsx'
+            download
+            className='inline-flex items-center rounded-full border border-slate-300 bg-white px-3 py-1.5 text-xs font-bold text-slate-900 shadow-sm hover:border-slate-400 hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600 focus-visible:ring-offset-2'
+          >
+            Monatsplan (4 Tage)
+          </a>
+          <a
+            href='/Speiseplan_Template_Monat.xlsx'
+            download
+            className='inline-flex items-center rounded-full border border-slate-300 bg-white px-3 py-1.5 text-xs font-bold text-slate-900 shadow-sm hover:border-slate-400 hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600 focus-visible:ring-offset-2'
+          >
+            Monatsplan (5 Tage)
+          </a>
+        </div>
       </div>
     </div>
   );

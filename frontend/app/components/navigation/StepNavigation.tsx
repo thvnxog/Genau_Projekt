@@ -1,4 +1,5 @@
 import React from 'react';
+import { LoadingSpinner } from '../ui/LoadingSpinner';
 
 // Kleine Navigationsleiste für den Upload/Report-Flow.
 type Step = 'upload' | 'report';
@@ -42,11 +43,16 @@ export function StepNavigation({
           disabled={loading}
           onClick={onNext}
         >
-          {loading
-            ? 'Lade…'
-            : step === 'upload'
-              ? 'Weiter'
-              : 'Weiter zum Selbstcheck'}
+          {loading ? (
+            <span className='inline-flex items-center gap-2'>
+              <LoadingSpinner className='text-white' />
+              Lade...
+            </span>
+          ) : step === 'upload' ? (
+            'Weiter'
+          ) : (
+            'Weiter zum Selbstcheck'
+          )}
         </button>
       </div>
     </div>

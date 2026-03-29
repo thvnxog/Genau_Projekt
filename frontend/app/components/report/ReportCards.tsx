@@ -50,7 +50,8 @@ export function RulesList({
   // Filtert auf anwendbare Regeln und optional nur Verstöße.
   const rules = rep.rules
     .filter((r: RuleResult) => r.applies)
-    .filter((r: RuleResult) => (onlyFailed ? !r.passed : true));
+    .filter((r: RuleResult) => (onlyFailed ? !r.passed : true))
+    .sort((a, b) => Number(a.passed) - Number(b.passed));
 
   return (
     <div className='mt-2 grid gap-2'>
