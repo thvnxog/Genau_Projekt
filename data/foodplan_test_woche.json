@@ -1,0 +1,249 @@
+{
+  "schema_version": "1.0",
+  "source": {
+    "type": "json",
+    "file": "foodplan_test_woche.json"
+  },
+  "context": {
+    "meal_type": "lunch",
+    "timezone": "Europe/Berlin"
+  },
+  "days": [
+    {
+      "weekday": "Montag",
+      "week_index": 0,
+      "week_label": "Woche 1",
+      "menus": [
+        {
+          "menu_type": "mischkost",
+          "items": [
+            {
+              "raw_text": "Vollkornnudeln mit Tomatensauce",
+              "portion": { "value": 220, "unit": "g" },
+              "links": { "food_group": "grains_potatoes" },
+              "tags": ["wholegrain"]
+            },
+            {
+              "raw_text": "Gurkensalat",
+              "portion": { "value": 120, "unit": "g" },
+              "links": { "food_group": "vegetables" },
+              "tags": ["raw_veg"]
+            }
+          ]
+        },
+        {
+          "menu_type": "vegetarisch",
+          "items": [
+            {
+              "raw_text": "Linseneintopf mit Kartoffeln",
+              "portion": { "value": 280, "unit": "g" },
+              "links": { "food_group": "legumes" },
+              "tags": []
+            },
+            {
+              "raw_text": "Apfel",
+              "portion": { "value": 100, "unit": "g" },
+              "links": { "food_group": "fruit" },
+              "tags": ["whole_fruit"]
+            }
+          ]
+        },
+        {
+          "menu_type": "dessert",
+          "items": [
+            {
+              "raw_text": "Naturjoghurt",
+              "portion": { "value": 125, "unit": "g" },
+              "links": { "food_group": "dairy" },
+              "tags": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "weekday": "Dienstag",
+      "week_index": 0,
+      "week_label": "Woche 1",
+      "menus": [
+        {
+          "menu_type": "mischkost",
+          "items": [
+            {
+              "raw_text": "Seelachsfilet mit Kartoffelpuree",
+              "portion": { "value": 250, "unit": "g" },
+              "links": { "food_group": "fish" },
+              "tags": ["potato_product"]
+            },
+            {
+              "raw_text": "Brokkoli",
+              "portion": { "value": 140, "unit": "g" },
+              "links": { "food_group": "vegetables" },
+              "tags": []
+            }
+          ]
+        },
+        {
+          "menu_type": "vegetarisch",
+          "items": [
+            {
+              "raw_text": "Gemueselasagne",
+              "portion": { "value": 260, "unit": "g" },
+              "links": { "food_group": "vegetables" },
+              "tags": []
+            }
+          ]
+        },
+        {
+          "menu_type": "dessert",
+          "items": [
+            {
+              "raw_text": "Banane",
+              "portion": { "value": 110, "unit": "g" },
+              "links": { "food_group": "fruit" },
+              "tags": ["whole_fruit"]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "weekday": "Mittwoch",
+      "week_index": 0,
+      "week_label": "Woche 1",
+      "menus": [
+        {
+          "menu_type": "mischkost",
+          "items": [
+            {
+              "raw_text": "Haehnchenragout mit Reis",
+              "portion": { "value": 270, "unit": "g" },
+              "links": { "food_group": "meat" },
+              "tags": []
+            },
+            {
+              "raw_text": "Karottensalat",
+              "portion": { "value": 100, "unit": "g" },
+              "links": { "food_group": "vegetables" },
+              "tags": ["raw_veg"]
+            }
+          ]
+        },
+        {
+          "menu_type": "vegetarisch",
+          "items": [
+            {
+              "raw_text": "Kichererbsencurry",
+              "portion": { "value": 240, "unit": "g" },
+              "links": { "food_group": "legumes" },
+              "tags": []
+            }
+          ]
+        },
+        {
+          "menu_type": "dessert",
+          "items": [
+            {
+              "raw_text": "Birne",
+              "portion": { "value": 100, "unit": "g" },
+              "links": { "food_group": "fruit" },
+              "tags": ["whole_fruit"]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "weekday": "Donnerstag",
+      "week_index": 0,
+      "week_label": "Woche 1",
+      "menus": [
+        {
+          "menu_type": "mischkost",
+          "items": [
+            {
+              "raw_text": "Rindergulasch mit Spaetzle",
+              "portion": { "value": 280, "unit": "g" },
+              "links": { "food_group": "meat" },
+              "tags": []
+            },
+            {
+              "raw_text": "Blattsalat",
+              "portion": { "value": 90, "unit": "g" },
+              "links": { "food_group": "vegetables" },
+              "tags": ["raw_veg"]
+            }
+          ]
+        },
+        {
+          "menu_type": "vegetarisch",
+          "items": [
+            {
+              "raw_text": "Kartoffel-Gemuese-Auflauf",
+              "portion": { "value": 260, "unit": "g" },
+              "links": { "food_group": "grains_potatoes" },
+              "tags": ["potato_product"]
+            }
+          ]
+        },
+        {
+          "menu_type": "dessert",
+          "items": [
+            {
+              "raw_text": "Joghurt mit Obst",
+              "portion": { "value": 130, "unit": "g" },
+              "links": { "food_group": "dairy" },
+              "tags": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "weekday": "Freitag",
+      "week_index": 0,
+      "week_label": "Woche 1",
+      "menus": [
+        {
+          "menu_type": "mischkost",
+          "items": [
+            {
+              "raw_text": "Putenbraten mit Kartoffeln",
+              "portion": { "value": 260, "unit": "g" },
+              "links": { "food_group": "meat" },
+              "tags": []
+            },
+            {
+              "raw_text": "Erbsen und Moehren",
+              "portion": { "value": 130, "unit": "g" },
+              "links": { "food_group": "vegetables" },
+              "tags": []
+            }
+          ]
+        },
+        {
+          "menu_type": "vegetarisch",
+          "items": [
+            {
+              "raw_text": "Vollkornpizza Margherita",
+              "portion": { "value": 250, "unit": "g" },
+              "links": { "food_group": "grains_potatoes" },
+              "tags": ["wholegrain"]
+            }
+          ]
+        },
+        {
+          "menu_type": "dessert",
+          "items": [
+            {
+              "raw_text": "Apfelmus",
+              "portion": { "value": 80, "unit": "g" },
+              "links": { "food_group": "fruit" },
+              "tags": []
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

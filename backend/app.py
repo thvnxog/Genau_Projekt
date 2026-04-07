@@ -237,12 +237,67 @@ def create_app():
 
         return plan, stats
 
+    def build_plan_from_json_upload(f) -> tuple[dict, dict]:
+        """Liest eine hochgeladene JSON-Datei und extrahiert den Plan.
+
+        Erlaubte Formen:
+        1) komplettes Plan-Dokument: {"days": [...], ...}
+        2) Wrapper-Objekt: {"plan": {"days": [...], ...}}
+        """
+
+        try:
+            payload = json.load(f.stream)
+        except Exception as e:
+            detail = str(e).strip() or "Ungueltiges JSON."
+            abort(
+                400,
+                description=(
+                    "JSON-Datei konnte nicht gelesen werden. "
+                    f"Details: {detail}"
+                ),
+            )
+
+        plan_candidate = payload.get("plan") if isinstance(payload, dict) else None
+        plan = plan_candidate if isinstance(plan_candidate, dict) else payload
+
+        if not isinstance(plan, dict):
+            abort(
+                400,
+                description=(
+                    "JSON-Datei hat ein ungueltiges Format. "
+                    "Erwartet wird ein Objekt mit 'days' oder ein Objekt mit 'plan'."
+                ),
+            )
+
+        if not isinstance(plan.get("days"), list):
+            abort(
+                400,
+                description=(
+                    "JSON-Datei hat ein ungueltiges Plan-Format: 'days' fehlt oder ist keine Liste."
+                ),
+            )
+
+        return normalize_plan(plan), {"source": "json_upload"}
+
+    def build_plan_from_upload(f) -> tuple[dict, dict]:
+        """Parst Upload-Datei (.xlsx oder .json) in ein Plan-Dokument."""
+
+        filename = secure_filename(f.filename or "upload.xlsx")
+        suffix = Path(filename).suffix.lower()
+
+        if suffix == ".xlsx":
+            return build_enriched_plan_from_xlsx_upload(f)
+        if suffix == ".json":
+            return build_plan_from_json_upload(f)
+
+        abort(400, description="Bitte eine .xlsx oder .json Datei hochladen.")
+
     @app.post("/api/preview")
     def preview():
         """Preview-Endpunkt für den Selbstcheck.
 
         Erwartet:
-        - multipart/form-data Upload mit Feldname "file" (.xlsx)
+        - multipart/form-data Upload mit Feldname "file" (.xlsx oder .json)
 
         Liefert:
         - den geparsten+enriched Plan (damit der User food_group/tags korrigieren kann)
@@ -257,7 +312,7 @@ def create_app():
         if school_level is None:
             abort(400, description="school_level muss 'P' oder 'S' sein.")
 
-        plan, stats = build_enriched_plan_from_xlsx_upload(f)
+        plan, stats = build_plan_from_upload(f)
 
         return {
             "schema_version": "1.0",
@@ -272,7 +327,7 @@ def create_app():
         """Analysiert einen hochgeladenen Speiseplan und gibt einen Dual-Report zurück.
 
         Zwei Modi:
-        1) XLSX Upload (wie bisher): multipart/form-data mit Feld "file"
+        1) Datei-Upload: multipart/form-data mit Feld "file" (.xlsx oder .json)
         2) Korrigierter Plan: application/json Body { plan: <foodplan> }
 
         Dadurch kann das Frontend erst einen Selbstcheck machen und dann den
@@ -290,13 +345,13 @@ def create_app():
             if isinstance(candidate, dict):
                 plan = normalize_plan(candidate)
 
-        # (B) Fallback: XLSX Upload
+        # (B) Fallback: Datei-Upload
         if plan is None:
             f = request.files.get("file")
             if not f:
                 abort(400, description="Kein Upload unter 'file' gefunden.")
             school_level = normalize_school_level(request.form.get("school_level"))
-            plan, _stats = build_enriched_plan_from_xlsx_upload(f)
+            plan, _stats = build_plan_from_upload(f)
 
         if school_level is None:
             abort(400, description="school_level muss 'P' oder 'S' sein.")

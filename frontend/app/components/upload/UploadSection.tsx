@@ -103,7 +103,7 @@ export function UploadSection({
       <input
         ref={fileInputRef}
         type='file'
-        accept='.xlsx'
+        accept='.xlsx,.json,application/json'
         className='hidden'
         onChange={(e) => setFile(e.target.files?.[0] ?? null)}
       />

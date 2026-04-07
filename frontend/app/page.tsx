@@ -67,7 +67,7 @@ export default function Page() {
     setSelfCheckWeekIndex(0);
 
     if (!file) {
-      setError('Bitte eine Datei auswählen (.xlsx).');
+      setError('Bitte eine Datei auswählen (.xlsx oder .json).');
       return;
     }
 
