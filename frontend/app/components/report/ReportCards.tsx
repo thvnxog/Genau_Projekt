@@ -56,7 +56,9 @@ export function RulesList({
   const gramHints = rep.gram_hints ?? [];
   const usedGramHintIds = new Set<string>();
 
-  function normalizeTargetValues(value: string | string[] | undefined): string[] {
+  function normalizeTargetValues(
+    value: string | string[] | undefined,
+  ): string[] {
     if (!value) return [];
     return (Array.isArray(value) ? value : [value]).filter(Boolean);
   }
@@ -127,7 +129,11 @@ export function RulesList({
                     key={h.id}
                     className='rounded bg-white px-1.5 py-0.5 border border-slate-200'
                   >
-                    Gramm: <b>{h.current_grams.toFixed(1)} / {h.target_grams.toFixed(1)} g</b>
+                    Gramm:{' '}
+                    <b>
+                      {h.current_grams.toFixed(1)} / {h.target_grams.toFixed(1)}{' '}
+                      g
+                    </b>
                     {h.missing_grams > 0 ? (
                       <>
                         {' · '}noch <b>{h.missing_grams.toFixed(1)} g</b>
