@@ -52,6 +52,7 @@ export default function Page() {
     setError(null);
     setActiveWeekIndex(0);
     setSelfCheckWeekIndex(0);
+    setSchoolLevel(null);
     setStep('upload');
     if (fileInputRef.current) fileInputRef.current.value = '';
   }

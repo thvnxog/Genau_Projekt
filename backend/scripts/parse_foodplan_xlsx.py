@@ -5,9 +5,9 @@
 # Annahmen (aktuelles Template):
 # - Sheet: "Tabelle1"
 # - Spalte 0: Wochentage ("Montag"..."Freitag") markieren Tagesblöcke
-# - Mischkost-Block:   Spalten 1..3  (Name | Portion | Notes)
-# - Vegetarisch-Block: Spalten 4..6  (Name | Portion | Notes)
-# - Dessert-Block:     Spalten 7..9  (Name | Portion | Notes)
+# - Mischkost-Block:   Spalten 1..3  (Name | Gramm | Zusatz)
+# - Vegetarisch-Block: Spalten 4..6  (Name | Gramm | Zusatz)
+# - Dessert-Block:     Spalten 7..9  (Name | Gramm | Zusatz)
 #
 # Das ist bewusst NICHT generisch (MVP). Parser später erweitern.
 # ------------------------------------------------------------
@@ -71,13 +71,25 @@ def extract_week_label(value: Optional[str], fallback_index: int) -> str:
 
 def parse_amount(text: Optional[str]) -> Optional[dict]:
     """
-    Portion sehr simpel parsen:
+    Gramm sehr simpel parsen:
+      - nackte Zahlen aus der Gramm-Spalte (z. B. `200`)
       - "200 g", "200g"
       - "120 ml", "120ml"
     """
     if not text:
         return None
+
+    if isinstance(text, (int, float)) and not isinstance(text, bool):
+        return {"value": float(text), "unit": "g"}
+
     s = text.strip().lower().replace(" ", "")
+
+    # Dezimal-Komma aus Excel-Texten abfangen.
+    s = s.replace(",", ".")
+
+    # Reine Zahl ohne Einheit gilt hier als Gramm.
+    if re.match(r"^\d+(?:\.\d+)?$", s):
+        return {"value": float(s), "unit": "g"}
 
     m = re.match(r"^(\d+(?:\.\d+)?)\s*(g|ml)$", s)
     if not m:
@@ -146,9 +158,12 @@ def parse_block(block_df: pd.DataFrame, name_col: int, amount_col: int, notes_co
         if not name and not amount and not notes:
             continue
 
-        # Fortsetzung ohne neue Portion/Notes (z.B. durch Zeilenumbruch)
-        if name and current and not amount and not notes:
+        # Fortsetzung eines bestehenden Gerichts, wenn in der Gramm-Spalte kein neuer Wert steht.
+        # Damit bleiben mehrzeilige Gerichtsnamen (inkl. Zusatz-Spalte) am gleichen Item hängen.
+        if name and current and not amount:
             current["raw_text"] = join_hyphen(current["raw_text"], name)
+            if notes:
+                current["notes"].append(notes)
             continue
 
         # Reine Zubereitungszeile (z.B. "überbacken") an vorheriges Gericht anhängen,

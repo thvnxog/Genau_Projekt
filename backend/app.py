@@ -370,9 +370,11 @@ def create_app():
                 "schema_version": "1.0",
                 "mode": "dual",
                 "school_level": school_level,
-                "mixed": evaluate_plan_for_diet(plan, rules_doc, "mixed"),
+                "mixed": evaluate_plan_for_diet(
+                    plan, rules_doc, "mixed", school_level
+                ),
                 "ovo_lacto_vegetarian": evaluate_plan_for_diet(
-                    plan, rules_doc, "ovo_lacto_vegetarian"
+                    plan, rules_doc, "ovo_lacto_vegetarian", school_level
                 ),
             }
             return report
@@ -384,9 +386,14 @@ def create_app():
                 {
                     "week_index": wp["week_index"],
                     "week_label": wp["week_label"],
-                    "mixed": evaluate_plan_for_diet(wp["plan"], rules_doc, "mixed"),
+                    "mixed": evaluate_plan_for_diet(
+                        wp["plan"], rules_doc, "mixed", school_level
+                    ),
                     "ovo_lacto_vegetarian": evaluate_plan_for_diet(
-                        wp["plan"], rules_doc, "ovo_lacto_vegetarian"
+                        wp["plan"],
+                        rules_doc,
+                        "ovo_lacto_vegetarian",
+                        school_level,
                     ),
                 }
             )

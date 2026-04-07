@@ -53,6 +53,13 @@ Empfehlung fuer die Umsetzung im Projekt:
 - Regeln optional zweistufig bewerten:
   - hart bei `recipe`
   - weich/hinweisbasiert bei `profile` und `keyword_fallback`
+- Der Report soll sichtbar darauf hinweisen, dass Grammwerte geschaetzt sind.
+
+## Aktueller Stand der Umsetzung
+
+- Die Auswertung verwendet bereits eine Schätzung auf Basis erkannter Lebensmittelgruppen und Portionsangaben.
+- Wenn ein Gericht mehrere Gruppen hat, wird die Grammmenge anteilig aufgeteilt.
+- Im Report erscheint ein Hinweistext zur geschätzten Gramm-Auswertung.
 
 Offen zur Bestaetigung im naechsten Termin:
 

@@ -151,17 +151,8 @@ def collect_counts_and_evidence(plan: dict, selected_diet: str) -> Tuple[
 
         raw_text = item.get("raw_text")
 
-        links = item.get("links") or {}
-        single_group = links.get("food_group")
-
-        # --- food_group(s) zählen ----------------------------------------------
-        multi_groups = item.get("food_groups")
-        if isinstance(multi_groups, list) and multi_groups:
-            groups_to_count = [g for g in multi_groups if isinstance(g, str) and g.strip()]
-        elif single_group:
-            groups_to_count = [single_group]
-        else:
-            groups_to_count = []
+        # --- food_group(s) zählen / schätzen ----------------------------------
+        groups_to_count = infer_groups_for_item(item)
 
         for group in groups_to_count:
             group_counts[group] = group_counts.get(group, 0) + 1
@@ -186,8 +177,11 @@ def collect_counts_and_evidence(plan: dict, selected_diet: str) -> Tuple[
             value = float(amount_value)
 
             # Vereinheitlicht: ml wird wie g behandelt (1:1), damit alle Regeln in Gramm arbeiten.
-            for group in groups_to_count:
-                group_grams[group] = group_grams.get(group, 0.0) + value
+            # Wenn ein Gericht mehrere Gruppen hat, wird die Menge anteilig verteilt.
+            if groups_to_count:
+                share = value / float(len(groups_to_count))
+                for group in groups_to_count:
+                    group_grams[group] = group_grams.get(group, 0.0) + share
             for t in tags:
                 tag_grams[t] = tag_grams.get(t, 0.0) + value
 
@@ -240,14 +234,114 @@ def as_list(value):
 
     return value if isinstance(value, list) else [value]
 
+TAG_TO_GROUP_HINT = {
+    "raw_veg": "vegetables",
+    "wholegrain": "grains_potatoes",
+    "potato_product": "grains_potatoes",
+    "whole_fruit": "fruit",
+}
 
-def count_plan_days(plan: dict) -> int:
-    """Ermittelt die Anzahl der Tage im aktuellen Plan."""
+RAW_TEXT_GROUP_HINTS = {
+    "grains_potatoes": [
+        "kartoffel",
+        "nudel",
+        "reis",
+        "brot",
+        "spätzle",
+        "spaetzle",
+        "gnocchi",
+        "couscous",
+        "polenta",
+    ],
+    "vegetables": [
+        "gemüse",
+        "gemuese",
+        "salat",
+        "brokkoli",
+        "karotte",
+        "karotten",
+        "tomate",
+        "spinat",
+        "zucchini",
+        "paprika",
+        "pilz",
+        "rohkost",
+    ],
+    "legumes": ["bohne", "bohnen", "linse", "linsen", "kichererbse", "erbsen"],
+    "fruit": ["apfel", "birne", "obst", "beeren", "banane", "orange", "mandarine"],
+    "dairy": ["milch", "joghurt", "quark", "käse", "kaese", "sahne"],
+    "meat": ["fleisch", "hähnchen", "haehnchen", "pute", "schwein", "rind", "wurst"],
+    "fish": ["fisch", "lachs", "seelachs", "forelle", "kabeljau", "thunfisch", "matjes"],
+}
 
-    return len(plan.get("days", []) or [])
+
+def infer_groups_for_item(item: dict) -> List[str]:
+    """Leitet eine grobe Gruppe für die Schätzung ab, wenn keine explizite Gruppe vorliegt."""
+
+    groups: List[str] = []
+
+    links = item.get("links") or {}
+    single_group = links.get("food_group")
+    if isinstance(single_group, str) and single_group.strip():
+        groups.append(single_group.strip())
+
+    multi_groups = item.get("food_groups")
+    if isinstance(multi_groups, list):
+        for group in multi_groups:
+            if isinstance(group, str) and group.strip():
+                groups.append(group.strip())
+
+    if groups:
+        return list(dict.fromkeys(groups))
+
+    tags = item.get("tags") or []
+    for tag in tags:
+        hint = TAG_TO_GROUP_HINT.get(tag)
+        if hint:
+            groups.append(hint)
+
+    raw_text = (item.get("raw_text") or "").lower()
+    for group, keywords in RAW_TEXT_GROUP_HINTS.items():
+        if any(keyword in raw_text for keyword in keywords):
+            groups.append(group)
+
+    return list(dict.fromkeys(groups))
 
 
-def adjusted_threshold_for_plan(rule: dict, rules_doc: dict, plan: dict) -> float:
+def resolve_threshold(rule: dict, school_level: str | None) -> float:
+    """Liest den passenden Schwellenwert für die gewählte Schulstufe."""
+
+    thresholds = rule.get("thresholds")
+    if isinstance(thresholds, dict) and school_level:
+        raw_value = thresholds.get(school_level) or thresholds.get(school_level.lower())
+        if raw_value is not None:
+            return float(raw_value)
+
+    raw_threshold = rule.get("threshold", 0)
+    try:
+        return float(raw_threshold)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def count_plan_days(plan: dict, selected_diet: str) -> int:
+    """Zählt nur Tage, die für die Diet mindestens ein Gericht enthalten."""
+
+    count = 0
+    for day in plan.get("days", []) or []:
+        for menu in day.get("menus", []) or []:
+            if not menu_included_for_diet(menu.get("menu_type"), selected_diet):
+                continue
+            if (menu.get("items", []) or []):
+                count += 1
+                break
+
+    return count
+
+
+def adjusted_threshold_for_plan(
+    rule: dict, rules_doc: dict, plan: dict, selected_diet: str
+) -> float:
     """Passt den Schwellenwert an die tatsächliche Anzahl Planungstage an.
 
     Entscheidung:
@@ -271,7 +365,7 @@ def adjusted_threshold_for_plan(rule: dict, rules_doc: dict, plan: dict) -> floa
     if base_days <= 0:
         return threshold
 
-    observed_days = float(count_plan_days(plan))
+    observed_days = float(count_plan_days(plan, selected_diet))
     if observed_days <= 0:
         return threshold
 
@@ -281,9 +375,31 @@ def adjusted_threshold_for_plan(rule: dict, rules_doc: dict, plan: dict) -> floa
     return round(threshold * (observed_days / base_days), 2)
 
 
+def build_calculation_hint(school_level: str | None, considered_days: int) -> dict:
+    """Beschreibt die Schätzlogik für den Report."""
+
+    level_label = {
+        "P": "Primarstufe",
+        "S": "Sekundarstufe",
+    }.get(school_level or "", "unbekannte Stufe")
+
+    return {
+        "mode": "estimated",
+        "school_level": school_level,
+        "school_level_label": level_label,
+        "days_considered": considered_days,
+        "note": (
+            "Grammwerte werden aus Portionsangaben und erkannten Lebensmittelgruppen "
+            "geschätzt; bei gemischten Gerichten werden Mengen anteilig auf erkannte "
+            "Gruppen verteilt."
+        ),
+    }
+
+
 def build_rule_result(
     rule: dict,
     selected_diet: str,
+    school_level: str | None,
     group_counts: dict,
     tag_counts: dict,
     group_grams: dict,
@@ -297,8 +413,8 @@ def build_rule_result(
     - target lesen (count_by + values)
     - Ist-Wert (actual) durch Summieren der Counts bestimmen
     - passed = Operator(actual, threshold)
-    - expected als Text ("mind.", "max.", "genau") für die UI erzeugen
-    - eine Evidence-Sample-Liste anhängen (für Debug/Erklärbarkeit)
+    - expected als Text erzeugen
+    - Evidence-Samples sammeln
     """
 
     target = rule.get("target") or {}
@@ -307,7 +423,7 @@ def build_rule_result(
     values = as_list(value)
 
     operator = rule.get("operator")
-    threshold = float(rule.get("threshold", 0))
+    threshold = resolve_threshold(rule, school_level)
 
     actual = 0.0
     evidence: List[dict] = []
@@ -359,7 +475,38 @@ def build_rule_result(
     }
 
 
-def evaluate_plan_for_diet(plan: dict, rules_doc: dict, selected_diet: str) -> dict:
+def is_gram_hint_rule(rule: dict) -> bool:
+    """Erkennt Regeln, die nur als Gramm-Hinweis im Report gezeigt werden sollen."""
+
+    target = rule.get("target") or {}
+    count_by = target.get("count_by")
+    return count_by in {"food_group_grams", "tag_grams"}
+
+
+def build_gram_hint(rule_result: dict) -> dict:
+    """Formatiert ein Regelresultat als reinen Gramm-Hinweis."""
+
+    current = float(rule_result.get("actual", 0) or 0)
+    target_value = float(rule_result.get("threshold", 0) or 0)
+    missing = max(0.0, round(target_value - current, 2))
+
+    return {
+        "id": rule_result.get("id"),
+        "label": rule_result.get("label"),
+        "target": rule_result.get("target"),
+        "current_grams": round(current, 2),
+        "target_grams": round(target_value, 2),
+        "missing_grams": missing,
+        "status": "ok" if missing <= 0 else "needs_more",
+    }
+
+
+def evaluate_plan_for_diet(
+    plan: dict,
+    rules_doc: dict,
+    selected_diet: str,
+    school_level: str | None = None,
+) -> dict:
     """Erzeugt den Report für eine Diet (mixed oder ovo_lacto_vegetarian)."""
 
     (
@@ -372,18 +519,25 @@ def evaluate_plan_for_diet(plan: dict, rules_doc: dict, selected_diet: str) -> d
     ) = collect_counts_and_evidence(plan, selected_diet)
 
     rule_results: List[dict] = []
+    gram_hints: List[dict] = []
     applicable = 0
     passed = 0
 
     # Regeln durchlaufen und nacheinander bewerten
     for rule in rules_doc.get("rules", []) or []:
-        effective_threshold = adjusted_threshold_for_plan(rule, rules_doc, plan)
         eval_rule = dict(rule)
+        eval_rule["threshold"] = resolve_threshold(rule, school_level)
+        eval_rule.pop("thresholds", None)
+
+        effective_threshold = adjusted_threshold_for_plan(
+            eval_rule, rules_doc, plan, selected_diet
+        )
         eval_rule["threshold"] = effective_threshold
 
         res = build_rule_result(
             eval_rule,
             selected_diet,
+            school_level,
             group_counts,
             tag_counts,
             group_grams,
@@ -391,6 +545,12 @@ def evaluate_plan_for_diet(plan: dict, rules_doc: dict, selected_diet: str) -> d
             evidence_groups,
             evidence_tags,
         )
+
+        if is_gram_hint_rule(eval_rule):
+            if res["applies"]:
+                gram_hints.append(build_gram_hint(res))
+            # Gramm-Hinweise beeinflussen den Score nicht und tauchen nicht in Regeln auf.
+            continue
 
         # Score nur aus Regeln berechnen, die für diese Diet gelten
         if res["applies"]:
@@ -406,12 +566,17 @@ def evaluate_plan_for_diet(plan: dict, rules_doc: dict, selected_diet: str) -> d
     return {
         "schema_version": "1.0",
         "diet": selected_diet,
+        "school_level": school_level,
         "scope": rules_doc.get("scope"),
+        "calculation": build_calculation_hint(
+            school_level, count_plan_days(plan, selected_diet)
+        ),
         "summary": {
             "applicable_rules": applicable,
             "passed_rules": passed,
             "score": score,
         },
+        "gram_hints": gram_hints,
         "counts": {
             "food_groups": group_counts,
             "tags": tag_counts,

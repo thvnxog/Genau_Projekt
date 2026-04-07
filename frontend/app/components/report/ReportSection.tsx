@@ -21,8 +21,27 @@ export function ReportSection({
   setActiveWeekIndex,
   onGoToSelfcheck,
 }: ReportSectionProps) {
+  const calculationHint = reportData.calculation;
+
   return (
     <section className='grid gap-4.5'>
+      {calculationHint?.mode === 'estimated' && (
+        <div className='rounded-xl border border-sky-200 bg-sky-50 p-3 text-left text-slate-900'>
+          <div className='text-sm font-extrabold text-slate-900'>
+            Hinweis zur Gramm-Auswertung
+          </div>
+          <div className='mt-1 text-sm text-slate-800'>
+            {calculationHint.note}
+          </div>
+          <div className='mt-1 text-xs text-slate-700'>
+            Schulstufe: {calculationHint.school_level_label ?? 'unbekannt'}
+            {typeof calculationHint.days_considered === 'number'
+              ? ` · Berücksichtigte Tage: ${calculationHint.days_considered}`
+              : ''}
+          </div>
+        </div>
+      )}
+
       {/* Hinweis, wenn noch Items ohne Foodgroup im Plan sind. */}
       {missingFoodGroupCount > 0 && (
         <details className='rounded-xl border border-amber-200 bg-amber-50 p-3 text-left text-slate-900'>

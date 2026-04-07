@@ -9,19 +9,38 @@ export type RuleResult = {
   label: string;
   applies: boolean;
   passed: boolean;
+  target?: { count_by?: string; value?: string | string[] };
   expected?: string;
   actual?: number;
   notes?: string;
 };
 
+export type GramHint = {
+  id: string;
+  label: string;
+  target?: { count_by?: string; value?: string | string[] };
+  current_grams: number;
+  target_grams: number;
+  missing_grams: number;
+  status: 'ok' | 'needs_more';
+};
+
 export type ReportSingle = {
   summary: { score: number; passed_rules: number; applicable_rules: number };
+  gram_hints?: GramHint[];
   rules: RuleResult[];
 };
 
 export type ReportDual = {
   mode: 'dual';
   school_level?: SchoolLevel;
+  calculation?: {
+    mode: 'estimated';
+    school_level?: SchoolLevel | null;
+    school_level_label?: string;
+    days_considered?: number;
+    note?: string;
+  };
   mixed: ReportSingle;
   ovo_lacto_vegetarian: ReportSingle;
 };
@@ -36,6 +55,13 @@ export type WeeklyReportDual = {
 export type ReportMonthlyDual = {
   mode: 'monthly_dual';
   school_level?: SchoolLevel;
+  calculation?: {
+    mode: 'estimated';
+    school_level?: SchoolLevel | null;
+    school_level_label?: string;
+    days_considered?: number;
+    note?: string;
+  };
   monthly_summary: {
     weeks: number;
     mixed: ReportSingle['summary'];

@@ -7,6 +7,69 @@
   "diets": ["mixed", "ovo_lacto_vegetarian"],
   "rules": [
     {
+      "id": "LUNCH_GRAINS_POTATOES_GRAMS",
+      "label": "Getreide/Getreideprodukte/Kartoffeln nach Gramm",
+      "diet": "all",
+      "target": { "count_by": "food_group_grams", "value": "grains_potatoes" },
+      "operator": "min",
+      "thresholds": { "P": 600, "S": 650 },
+      "notes": "Geschätzte Grammwerte; Portionen werden aus dem Plan approximiert."
+    },
+    {
+      "id": "LUNCH_VEGETABLES_GRAMS_MIXED",
+      "label": "Gemüse/Salat nach Gramm (Mischkost)",
+      "diet": "mixed",
+      "target": { "count_by": "food_group_grams", "value": "vegetables" },
+      "operator": "min",
+      "thresholds": { "P": 800, "S": 900 },
+      "notes": "Geschätzte Grammwerte; Portionen werden aus dem Plan approximiert."
+    },
+    {
+      "id": "LUNCH_VEGETABLES_GRAMS_VEG",
+      "label": "Gemüse/Salat nach Gramm (Vegetarisch)",
+      "diet": "ovo_lacto_vegetarian",
+      "target": { "count_by": "food_group_grams", "value": "vegetables" },
+      "operator": "min",
+      "thresholds": { "P": 900, "S": 1000 },
+      "notes": "Geschätzte Grammwerte; Portionen werden aus dem Plan approximiert."
+    },
+    {
+      "id": "LUNCH_LEGUMES_GRAMS_MIXED",
+      "label": "Hülsenfrüchte nach Gramm (Mischkost)",
+      "diet": "mixed",
+      "target": { "count_by": "food_group_grams", "value": "legumes" },
+      "operator": "min",
+      "thresholds": { "P": 80, "S": 100 },
+      "notes": "Geschätzte Grammwerte; Portionen werden aus dem Plan approximiert."
+    },
+    {
+      "id": "LUNCH_LEGUMES_GRAMS_VEG",
+      "label": "Hülsenfrüchte nach Gramm (Vegetarisch)",
+      "diet": "ovo_lacto_vegetarian",
+      "target": { "count_by": "food_group_grams", "value": "legumes" },
+      "operator": "min",
+      "thresholds": { "P": 140, "S": 150 },
+      "notes": "Geschätzte Grammwerte; Portionen werden aus dem Plan approximiert."
+    },
+    {
+      "id": "LUNCH_FRUIT_GRAMS",
+      "label": "Obst nach Gramm",
+      "diet": "all",
+      "target": { "count_by": "food_group_grams", "value": "fruit" },
+      "operator": "min",
+      "thresholds": { "P": 150, "S": 150 },
+      "notes": "Geschätzte Grammwerte; Portionen werden aus dem Plan approximiert."
+    },
+    {
+      "id": "LUNCH_DAIRY_GRAMS",
+      "label": "Milch/Milchprodukte nach Gramm",
+      "diet": "all",
+      "target": { "count_by": "food_group_grams", "value": "dairy" },
+      "operator": "min",
+      "thresholds": { "P": 200, "S": 200 },
+      "notes": "Geschätzte Grammwerte; Portionen werden aus dem Plan approximiert."
+    },
+    {
       "id": "LUNCH_GRAINS_DAILY",
       "label": "Getreide/Getreideprodukte/Kartoffeln 1× täglich",
       "diet": "all",
