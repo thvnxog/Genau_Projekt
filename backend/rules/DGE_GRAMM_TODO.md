@@ -3,11 +3,6 @@
 Status: offen  
 Letzte Aktualisierung: 2026-03-29
 
-## Quelle
-
-- Grundlage ist die bereitgestellte DGE-Tabelle (Screenshot) fuer Mittagessen.
-- Die Werte unten sind als Arbeitsstand dokumentiert und muessen beim naechsten Termin final geprueft werden.
-
 ## Ziel
 
 - Umstellung von reinen Haeufigkeitsregeln auf Mengenregeln in Gramm.
@@ -182,3 +177,10 @@ Hinweis: Die Bezeichnungen in Klammern sind Vorschlaege fuer Mapping auf vorhand
 - Sollen P-Werte als harte Mindestwerte gelten und S-Bereiche nur als Empfehlung?
 - Wie strikt sollen Obergrenzen fuer Kategorien mit Bandbreiten (`max`) umgesetzt werden?
 - Brauchen wir separate Rule-Sets fuer 4 Tage und 5 Tage oder skalieren wir dynamisch?
+
+## Getroffene Entscheidung (2026-04-07)
+
+- Bei 4-Tage-Wochen wird fuer `min`-Schwellen der Dreisatz verwendet.
+- Formel: `threshold_4T = threshold_5T * (4/5)`.
+- `max`-Schwellen bleiben unveraendert (keine Absenkung), da nur ein Tag fehlt.
+- `equals` bleibt ebenfalls unveraendert.

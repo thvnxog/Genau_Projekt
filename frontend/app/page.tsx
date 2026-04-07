@@ -263,13 +263,17 @@ export default function Page() {
   }, [selfCheckWeekIndex, selfCheckWeeks]);
 
   const selfCheckDays = useMemo(() => {
-    // Filtert im Selbstcheck auf die aktive Woche.
+    // Filtert im Selbstcheck auf die aktive Woche und blendet leere Tage aus.
     const days = planDraft?.days ?? [];
     return days
       .map((day, dayIdx) => ({ day, dayIdx }))
-      .filter(
-        ({ day }) => (day.week_index ?? 0) === normalizedSelfCheckWeekIndex,
-      );
+      .filter(({ day }) => {
+        if ((day.week_index ?? 0) !== normalizedSelfCheckWeekIndex)
+          return false;
+
+        // Leere Tage (ohne Gerichte) werden nicht angezeigt.
+        return (day.menus ?? []).some((menu) => (menu.items ?? []).length > 0);
+      });
   }, [planDraft, normalizedSelfCheckWeekIndex]);
 
   function toggleItemFoodGroup(

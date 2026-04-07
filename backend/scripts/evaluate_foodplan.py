@@ -241,6 +241,46 @@ def as_list(value):
     return value if isinstance(value, list) else [value]
 
 
+def count_plan_days(plan: dict) -> int:
+    """Ermittelt die Anzahl der Tage im aktuellen Plan."""
+
+    return len(plan.get("days", []) or [])
+
+
+def adjusted_threshold_for_plan(rule: dict, rules_doc: dict, plan: dict) -> float:
+    """Passt den Schwellenwert an die tatsächliche Anzahl Planungstage an.
+
+    Entscheidung:
+    - `min` wird bei weniger Tagen per Dreisatz skaliert.
+    - `max` und `equals` bleiben unverändert.
+    """
+
+    threshold = float(rule.get("threshold", 0))
+    operator = (rule.get("operator") or "").strip().lower()
+
+    if operator != "min":
+        return threshold
+
+    scope = rules_doc.get("scope") or {}
+    base_days_raw = scope.get("time_window_days", 5)
+    try:
+        base_days = float(base_days_raw)
+    except (TypeError, ValueError):
+        base_days = 5.0
+
+    if base_days <= 0:
+        return threshold
+
+    observed_days = float(count_plan_days(plan))
+    if observed_days <= 0:
+        return threshold
+
+    if observed_days >= base_days:
+        return threshold
+
+    return round(threshold * (observed_days / base_days), 2)
+
+
 def build_rule_result(
     rule: dict,
     selected_diet: str,
@@ -337,8 +377,12 @@ def evaluate_plan_for_diet(plan: dict, rules_doc: dict, selected_diet: str) -> d
 
     # Regeln durchlaufen und nacheinander bewerten
     for rule in rules_doc.get("rules", []) or []:
+        effective_threshold = adjusted_threshold_for_plan(rule, rules_doc, plan)
+        eval_rule = dict(rule)
+        eval_rule["threshold"] = effective_threshold
+
         res = build_rule_result(
-            rule,
+            eval_rule,
             selected_diet,
             group_counts,
             tag_counts,
