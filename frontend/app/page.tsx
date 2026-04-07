@@ -14,6 +14,7 @@ import {
   type PlanDoc,
   type PreviewResponse,
   type RelevantTag,
+  type SchoolLevel,
 } from './lib/foodplan';
 
 // Page steuert den kompletten Ablauf: Upload -> Report -> Selbstcheck.
@@ -25,6 +26,7 @@ export default function Page() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [schoolLevel, setSchoolLevel] = useState<SchoolLevel | null>(null);
 
   // Report-/Wochenzustände.
   const [reportData, setReportData] = useState<AnalyzeResponse | null>(null);
@@ -68,10 +70,16 @@ export default function Page() {
       return;
     }
 
+    if (!schoolLevel) {
+      setError('Bitte erst Primarstufe (P) oder Sekundarstufe (S) auswählen.');
+      return;
+    }
+
     setLoading(true);
     try {
       const fd = new FormData();
       fd.append('file', file);
+      fd.append('school_level', schoolLevel);
 
       const res = await fetch('/api/preview', {
         method: 'POST',
@@ -115,7 +123,7 @@ export default function Page() {
       const analyzeRes = await fetch('/api/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ plan: data.plan }),
+        body: JSON.stringify({ plan: data.plan, school_level: schoolLevel }),
       });
 
       if (!analyzeRes.ok) {
@@ -152,12 +160,17 @@ export default function Page() {
       return;
     }
 
+    if (!schoolLevel) {
+      setError('Bitte erst Primarstufe (P) oder Sekundarstufe (S) auswählen.');
+      return;
+    }
+
     setLoading(true);
     try {
       const res = await fetch('/api/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ plan: planDraft }),
+        body: JSON.stringify({ plan: planDraft, school_level: schoolLevel }),
       });
 
       if (!res.ok) {
@@ -401,6 +414,8 @@ export default function Page() {
             fileInputRef={fileInputRef}
             setFile={setFile}
             setIsDragging={setIsDragging}
+            schoolLevel={schoolLevel}
+            setSchoolLevel={setSchoolLevel}
             clearSelectedFile={clearSelectedFile}
           />
         )}

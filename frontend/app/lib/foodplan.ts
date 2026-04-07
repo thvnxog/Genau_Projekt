@@ -2,6 +2,8 @@
 // Diese Datei bündelt gemeinsame Modelle, Labels und kleine Utility-Funktionen.
 
 // Ergebnis je Regel im Report.
+export type SchoolLevel = 'P' | 'S';
+
 export type RuleResult = {
   id: string;
   label: string;
@@ -19,6 +21,7 @@ export type ReportSingle = {
 
 export type ReportDual = {
   mode: 'dual';
+  school_level?: SchoolLevel;
   mixed: ReportSingle;
   ovo_lacto_vegetarian: ReportSingle;
 };
@@ -32,6 +35,7 @@ export type WeeklyReportDual = {
 
 export type ReportMonthlyDual = {
   mode: 'monthly_dual';
+  school_level?: SchoolLevel;
   monthly_summary: {
     weeks: number;
     mixed: ReportSingle['summary'];
@@ -70,6 +74,7 @@ export type PlanDoc = {
 export type PreviewResponse = {
   schema_version?: string;
   mode: 'preview';
+  school_level?: SchoolLevel;
   plan: PlanDoc;
   stats?: Record<string, unknown>;
 };

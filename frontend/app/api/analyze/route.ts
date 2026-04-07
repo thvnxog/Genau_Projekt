@@ -39,6 +39,7 @@ export async function POST(req: Request) {
   // 2) multipart/form-data (Upload)
   const incoming = await req.formData();
   const file = incoming.get('file');
+  const schoolLevel = incoming.get('school_level');
 
   if (!file || !(file instanceof File)) {
     return new Response("Kein Upload unter 'file' gefunden.", { status: 400 });
@@ -46,6 +47,9 @@ export async function POST(req: Request) {
 
   const fd = new FormData();
   fd.append('file', file, file.name);
+  if (typeof schoolLevel === 'string' && schoolLevel) {
+    fd.append('school_level', schoolLevel);
+  }
 
   const res = await fetch(`${backend}/api/analyze`, {
     method: 'POST',

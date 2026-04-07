@@ -1,4 +1,5 @@
 import React from 'react';
+import type { SchoolLevel } from '../../lib/foodplan';
 
 // Upload-Bereich für Datei-Auswahl per Klick oder Drag-and-Drop.
 type UploadSectionProps = {
@@ -7,6 +8,8 @@ type UploadSectionProps = {
   fileInputRef: React.RefObject<HTMLInputElement | null>;
   setFile: (file: File | null) => void;
   setIsDragging: (isDragging: boolean) => void;
+  schoolLevel: SchoolLevel | null;
+  setSchoolLevel: (level: SchoolLevel) => void;
   clearSelectedFile: () => void;
 };
 
@@ -16,6 +19,8 @@ export function UploadSection({
   fileInputRef,
   setFile,
   setIsDragging,
+  schoolLevel,
+  setSchoolLevel,
   clearSelectedFile,
 }: UploadSectionProps) {
   // Nimmt beim Drop immer die erste Datei.
@@ -147,6 +152,39 @@ export function UploadSection({
               </svg>
             </div>
           )}
+        </div>
+      </div>
+
+      <div className='rounded-xl border border-slate-200 bg-white p-3 text-left'>
+        <div className='text-sm font-extrabold text-slate-900'>
+          Stufe für die Auswertung wählen
+        </div>
+        <div className='mt-2 flex flex-wrap gap-2'>
+          <button
+            type='button'
+            onClick={() => setSchoolLevel('P')}
+            className={`cursor-pointer rounded-full border px-3 py-1.5 text-xs font-bold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600 focus-visible:ring-offset-2 ${
+              schoolLevel === 'P'
+                ? 'border-teal-700 bg-teal-700 text-white'
+                : 'border-slate-300 bg-white text-slate-900 hover:bg-slate-50'
+            }`}
+            aria-pressed={schoolLevel === 'P'}
+          >
+            Primarstufe (P)
+          </button>
+
+          <button
+            type='button'
+            onClick={() => setSchoolLevel('S')}
+            className={`cursor-pointer rounded-full border px-3 py-1.5 text-xs font-bold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600 focus-visible:ring-offset-2 ${
+              schoolLevel === 'S'
+                ? 'border-teal-700 bg-teal-700 text-white'
+                : 'border-slate-300 bg-white text-slate-900 hover:bg-slate-50'
+            }`}
+            aria-pressed={schoolLevel === 'S'}
+          >
+            Sekundarstufe (S)
+          </button>
         </div>
       </div>
 

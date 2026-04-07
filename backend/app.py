@@ -37,6 +37,18 @@ from models import db, Food
 load_dotenv()
 
 
+def normalize_school_level(raw_value) -> str | None:
+    """Normalisiert Schulstufe auf `P` oder `S` (oder None)."""
+
+    if raw_value is None:
+        return None
+
+    level = str(raw_value).strip().upper()
+    if level in {"P", "S"}:
+        return level
+    return None
+
+
 def create_app():
     """Erzeugt und konfiguriert die Flask-App.
 
@@ -241,11 +253,16 @@ def create_app():
         if not f:
             abort(400, description="Kein Upload unter 'file' gefunden.")
 
+        school_level = normalize_school_level(request.form.get("school_level"))
+        if school_level is None:
+            abort(400, description="school_level muss 'P' oder 'S' sein.")
+
         plan, stats = build_enriched_plan_from_xlsx_upload(f)
 
         return {
             "schema_version": "1.0",
             "mode": "preview",
+            "school_level": school_level,
             "plan": plan,
             "stats": stats,
         }
@@ -263,11 +280,13 @@ def create_app():
         """
 
         plan = None
+        school_level = None
 
         # (A) JSON-Body mit korrigiertem Plan
         if request.is_json:
             body = request.get_json(silent=True) or {}
             candidate = body.get("plan")
+            school_level = normalize_school_level(body.get("school_level"))
             if isinstance(candidate, dict):
                 plan = normalize_plan(candidate)
 
@@ -276,7 +295,11 @@ def create_app():
             f = request.files.get("file")
             if not f:
                 abort(400, description="Kein Upload unter 'file' gefunden.")
+            school_level = normalize_school_level(request.form.get("school_level"))
             plan, _stats = build_enriched_plan_from_xlsx_upload(f)
+
+        if school_level is None:
+            abort(400, description="school_level muss 'P' oder 'S' sein.")
 
         base_dir = Path(__file__).resolve().parent  # backend/
 
@@ -346,6 +369,7 @@ def create_app():
             report = {
                 "schema_version": "1.0",
                 "mode": "dual",
+                "school_level": school_level,
                 "mixed": evaluate_plan_for_diet(plan, rules_doc, "mixed"),
                 "ovo_lacto_vegetarian": evaluate_plan_for_diet(
                     plan, rules_doc, "ovo_lacto_vegetarian"
@@ -378,6 +402,7 @@ def create_app():
         return {
             "schema_version": "1.0",
             "mode": "monthly_dual",
+            "school_level": school_level,
             "monthly_summary": monthly_summary,
             "weekly_reports": weekly_reports,
         }
