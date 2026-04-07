@@ -23,6 +23,57 @@ export function ReportSection({
 }: ReportSectionProps) {
   const calculationHint = reportData.calculation;
 
+  function renderMissingFoodGroupHint() {
+    if (missingFoodGroupCount <= 0) return null;
+
+    return (
+      <details className='rounded-xl border border-amber-200 bg-amber-50 p-3 text-left text-slate-900'>
+        <summary className='cursor-pointer select-none rounded font-extrabold flex items-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600 focus-visible:ring-offset-2'>
+          <span className='text-lg'>⚠️</span>
+          <span>Hinweis – {missingFoodGroupCount} Gerichte ohne Zuordnung</span>
+        </summary>
+
+        <div className='mt-3 text-sm text-slate-800'>
+          <div className='mb-2'>
+            Für diese {missingFoodGroupCount} Gerichte konnte keine passende
+            Lebensmittel-Gruppe erkannt werden. Du kannst die Zuordnungen im
+            Selbstcheck ergänzen und den Report danach neu berechnen.
+          </div>
+
+          <button
+            type='button'
+            className='cursor-pointer rounded-[10px] border border-teal-700 bg-teal-700 px-3 py-2 text-sm font-extrabold text-white hover:bg-teal-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60'
+            disabled={loading}
+            onClick={onGoToSelfcheck}
+          >
+            Jetzt überarbeiten
+          </button>
+        </div>
+      </details>
+    );
+  }
+
+  function renderAmpelHint() {
+    return (
+      <div className='rounded-xl border border-slate-200 bg-white p-3 text-left text-slate-900'>
+        <div className='text-xs font-extrabold uppercase tracking-wide text-slate-700'>
+          Ampel-Erklärung
+        </div>
+        <div className='mt-2 flex flex-wrap gap-2 text-xs'>
+          <span className='rounded-full border border-emerald-600 bg-emerald-200 px-2.5 py-1 font-semibold text-emerald-950'>
+            Grün: alles im grünen Bereich
+          </span>
+          <span className='rounded-full border border-orange-600 bg-orange-200 px-2.5 py-1 font-semibold text-orange-950'>
+            Orange: teilweise erfüllt, bitte prüfen
+          </span>
+          <span className='rounded-full border border-rose-600 bg-rose-200 px-2.5 py-1 font-semibold text-rose-950'>
+            Rot: Handlungsbedarf
+          </span>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <section className='grid gap-4.5'>
       {calculationHint?.mode === 'estimated' && (
@@ -42,34 +93,7 @@ export function ReportSection({
         </div>
       )}
 
-      {/* Hinweis, wenn noch Items ohne Foodgroup im Plan sind. */}
-      {missingFoodGroupCount > 0 && (
-        <details className='rounded-xl border border-amber-200 bg-amber-50 p-3 text-left text-slate-900'>
-          <summary className='cursor-pointer select-none rounded font-extrabold flex items-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600 focus-visible:ring-offset-2'>
-            <span className='text-lg'>⚠️</span>
-            <span>
-              Hinweis – {missingFoodGroupCount} Gerichte ohne Zuordnung
-            </span>
-          </summary>
-
-          <div className='mt-3 text-sm text-slate-800'>
-            <div className='mb-2'>
-              Für diese {missingFoodGroupCount} Gerichte konnte keine passende
-              Lebensmittel-Gruppe erkannt werden. Du kannst die Zuordnungen im
-              Selbstcheck ergänzen und den Report danach neu berechnen.
-            </div>
-
-            <button
-              type='button'
-              className='cursor-pointer rounded-[10px] border border-teal-700 bg-teal-700 px-3 py-2 text-sm font-extrabold text-white hover:bg-teal-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60'
-              disabled={loading}
-              onClick={onGoToSelfcheck}
-            >
-              Jetzt überarbeiten
-            </button>
-          </div>
-        </details>
-      )}
+      {renderAmpelHint()}
 
       {/* Monatsmodus: Woche auswählen und den aktiven Wochenreport anzeigen. */}
       {reportData.mode === 'monthly_dual' && (
@@ -112,6 +136,8 @@ export function ReportSection({
                   />
                 </div>
 
+                {renderMissingFoodGroupHint()}
+
                 <div className='grid grid-cols-1 gap-3 md:grid-cols-2'>
                   <div>
                     <h2 className='text-lg font-black'>Regeln – Mischkost</h2>
@@ -142,6 +168,8 @@ export function ReportSection({
               rep={reportData.ovo_lacto_vegetarian}
             />
           </div>
+
+          {renderMissingFoodGroupHint()}
 
           <div className='grid grid-cols-1 gap-3 md:grid-cols-2'>
             <div>

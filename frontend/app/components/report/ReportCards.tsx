@@ -4,9 +4,20 @@ import type { GramHint, ReportSingle, RuleResult } from '../../lib/foodplan';
 
 // Leitet aus dem Score eine einfache Ampelfarbe für die Karte ab.
 function ampelfarbe(score: number) {
-  if (score >= 0.8) return { name: 'Grün', bg: '#16a34a' };
-  if (score >= 0.6) return { name: 'Gelb', bg: '#f59e0b' };
-  return { name: 'Rot', bg: '#dc2626' };
+  if (score >= 0.8)
+    return {
+      cardClass: 'border-emerald-600 bg-emerald-200',
+      labelClass: 'text-emerald-950',
+    };
+  if (score >= 0.6)
+    return {
+      cardClass: 'border-orange-600 bg-orange-200',
+      labelClass: 'text-orange-950',
+    };
+  return {
+    cardClass: 'border-rose-600 bg-rose-200',
+    labelClass: 'text-rose-950',
+  };
 }
 
 export function ScoreCard({
@@ -19,22 +30,17 @@ export function ScoreCard({
   // Zeigt kompakt den Gesamtscore pro Ernährungsform.
   const s = rep.summary.score;
   const badge = ampelfarbe(s);
+  const passed = rep.summary.passed_rules;
+  const applicable = rep.summary.applicable_rules;
 
   return (
-    <div className='rounded-xl border border-slate-300 bg-white p-3.5 text-slate-900'>
-      <div className='flex items-center justify-between gap-3'>
-        <div className='text-lg font-extrabold'>{title}</div>
-        <div
-          className='rounded-full px-2.5 py-1 text-sm font-extrabold text-white'
-          style={{ background: badge.bg }}
-        >
-          {badge.name}
-        </div>
-      </div>
+    <div
+      className={`rounded-xl border p-3.5 text-slate-900 ${badge.cardClass}`}
+    >
+      <div className='text-lg font-extrabold'>{title}</div>
 
-      <div className='mt-2.5 text-base font-bold'>
-        {(s * 100).toFixed(1)}% ({rep.summary.passed_rules}/
-        {rep.summary.applicable_rules})
+      <div className={`mt-2.5 text-base font-bold ${badge.labelClass}`}>
+        {(s * 100).toFixed(1)}% • {passed}/{applicable} Regeln erfüllt
       </div>
     </div>
   );

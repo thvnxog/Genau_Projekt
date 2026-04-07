@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import type { SchoolLevel } from '../../lib/foodplan';
 
 // Upload-Bereich für Datei-Auswahl per Klick oder Drag-and-Drop.
@@ -23,6 +23,8 @@ export function UploadSection({
   setSchoolLevel,
   clearSelectedFile,
 }: UploadSectionProps) {
+  const [showHelpModal, setShowHelpModal] = useState(false);
+
   // Nimmt beim Drop immer die erste Datei.
   function pickFirstFile(dt: DataTransfer | null): File | null {
     if (!dt) return null;
@@ -33,6 +35,69 @@ export function UploadSection({
   return (
     // Kapselt den gesamten Upload-UI-Block inkl. Template-Link.
     <div className='mx-auto grid w-full max-w-205 justify-items-stretch gap-2'>
+      <div className='flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-3 py-2'>
+        <div className='text-sm font-bold text-slate-800'>
+          Neu hier? Kurzanleitung anzeigen
+        </div>
+        <button
+          type='button'
+          onClick={() => setShowHelpModal(true)}
+          className='cursor-pointer rounded-full border border-slate-300 bg-white px-3 py-1 text-xs font-bold text-slate-900 hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600 focus-visible:ring-offset-2'
+        >
+          Hilfe
+        </button>
+      </div>
+
+      {showHelpModal && (
+        <div className='fixed inset-0 z-50 grid place-items-center bg-slate-900/45 p-4'>
+          <div
+            role='dialog'
+            aria-modal='true'
+            aria-label='Kurzanleitung zum Speiseplan-Check'
+            className='w-full max-w-xl rounded-2xl border border-slate-200 bg-white p-4 text-left text-slate-900 shadow-2xl'
+          >
+            <div className='flex items-start justify-between gap-2'>
+              <div>
+                <div className='text-base font-black'>
+                  So startest du in 30 Sekunden
+                </div>
+                <div className='mt-1 text-sm text-slate-700'>
+                  Upload, Stufe wählen, Report lesen - dann bei Bedarf im
+                  Selbstcheck korrigieren.
+                </div>
+              </div>
+              <button
+                type='button'
+                onClick={() => setShowHelpModal(false)}
+                aria-label='Popup schliessen'
+                className='cursor-pointer rounded-full border border-slate-300 bg-white px-2.5 py-1 text-xs font-bold text-slate-700 hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600 focus-visible:ring-offset-2'
+              >
+                Schliessen
+              </button>
+            </div>
+
+            <div className='mt-3 grid gap-2 text-sm sm:grid-cols-3'>
+              <div className='rounded-lg border border-sky-100 bg-sky-50 px-3 py-2'>
+                <span className='font-black text-sky-700'>1</span> Vorlage
+                hochladen
+              </div>
+              <div className='rounded-lg border border-sky-100 bg-sky-50 px-3 py-2'>
+                <span className='font-black text-sky-700'>2</span> Stufe P oder
+                S wählen
+              </div>
+              <div className='rounded-lg border border-sky-100 bg-sky-50 px-3 py-2'>
+                <span className='font-black text-sky-700'>3</span> Report prüfen
+              </div>
+            </div>
+
+            <div className='mt-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700'>
+              Grammwerte werden im Report als Orientierung angezeigt
+              (Ist/Ziel/Fehlt) und helfen beim Nachsteuern.
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className='font-extrabold'>Datei hochladen</div>
 
       <input
