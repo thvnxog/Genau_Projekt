@@ -335,10 +335,10 @@ export function SelfCheckSection({
       </div>
 
       {/* Sticky-Leiste für schnelles Zurückspringen und Neu-Berechnen. */}
-      <div className='sticky bottom-0 z-10 -mx-4 mt-2 border-t border-slate-200 bg-white/90 p-3 backdrop-blur'>
-        <div className='flex flex-wrap items-center justify-between gap-2'>
-          <div className='text-xs text-slate-600'>
-            Schritt 3/3 – Selbstcheck
+      <div className='sticky bottom-0 z-10 -mx-4 mt-2 p-3'>
+        <div className='flex flex-wrap items-center justify-between gap-2 rounded-xl border border-sky-100 bg-sky-50/80 p-3 text-left backdrop-blur'>
+          <div className='text-sm font-extrabold text-slate-900'>
+            Schritt: <span className='font-black'>3/3 Selbstcheck</span>
           </div>
 
           <div className='flex flex-wrap gap-2'>
@@ -353,7 +353,7 @@ export function SelfCheckSection({
 
             <button
               type='button'
-              className='cursor-pointer rounded-[10px] border border-teal-700 bg-teal-700 px-3.5 py-2 text-sm font-extrabold text-white hover:bg-teal-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60'
+              className='cursor-pointer rounded-[10px] border border-teal-700 bg-teal-700 px-3 py-2 text-sm font-extrabold text-white hover:bg-teal-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60'
               disabled={loading}
               onClick={onAnalyze}
             >

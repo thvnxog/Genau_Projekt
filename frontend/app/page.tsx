@@ -43,6 +43,11 @@ export default function Page() {
   type Step = 'upload' | 'report' | 'selfcheck';
   const [step, setStep] = useState<Step>('upload');
 
+  function scrollToTop() {
+    // Nach einem Schrittwechsel soll der neue Bereich immer oben starten.
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
   // Entfernt die ausgewählte Datei und leert zusätzlich den versteckten File-Input.
   function clearSelectedFile() {
     setFile(null);
@@ -144,6 +149,7 @@ export default function Page() {
 
       setReportData(report);
       setStep('report');
+      requestAnimationFrame(() => scrollToTop());
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Unbekannter Fehler');
     } finally {
@@ -188,6 +194,7 @@ export default function Page() {
 
       setReportData(data);
       setStep('report');
+      requestAnimationFrame(() => scrollToTop());
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Unbekannter Fehler');
     } finally {
