@@ -69,7 +69,7 @@ def main():
                 "Lege die Datei in ../data/ oder setze BLS_XLSX_PATH in deiner .env"
             )
 
-        print(f"📥 Lese Excel ein: {xlsx_path}")
+        print(f"Lese Excel ein: {xlsx_path}")
 
         # Excel einlesen (pandas erkennt Tabellenblatt & Datentypen automatisch).
         # Falls nötig könnte man später: sheet_name=..., usecols=..., dtype=...
@@ -93,17 +93,12 @@ def main():
             if col not in df.columns:
                 raise KeyError(f"Spalte fehlt in Excel: {col}")
 
-        # --- Importstrategie ------------------------------------------------------
-        # Für PoC/Entwicklung machen wir einen "Reset":
-        # - alle vorhandenen Foods löschen
-        # - dann alles erneut importieren
-        # Vorteil: einfach und reproduzierbar.
-        # Nachteil: keine inkrementellen Updates.
-        print("🧹 Lösche alte Datensätze (POC-Reset)...")
+        # Alte Einträge werden vor dem Import gelöscht.
+        print("Lösche alte Datensätze...")
         Food.query.delete()
         db.session.commit()
 
-        print(f"🚚 Importiere {len(df)} Zeilen...")
+        print(f"Importiere {len(df)} Zeilen...")
 
         # Objekte sammeln und in einem Rutsch speichern (Performance)
         objects: list[Food] = []
@@ -132,8 +127,8 @@ def main():
         db.session.bulk_save_objects(objects)
         db.session.commit()
 
-        print(f"✅ Fertig! Importiert: {len(objects)} Einträge")
-        print("ℹ️ Du kannst jetzt den Server starten und /foods durchsuchen.")
+        print(f"Fertig! Importiert: {len(objects)} Einträge")
+        print("Du kannst jetzt den Server starten und /foods durchsuchen.")
 
 
 if __name__ == "__main__":

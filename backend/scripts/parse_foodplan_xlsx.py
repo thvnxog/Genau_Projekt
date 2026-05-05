@@ -9,7 +9,7 @@
 # - Vegetarisch-Block: Spalten 4..6  (Name | Gramm | Zusatz)
 # - Dessert-Block:     Spalten 7..9  (Name | Gramm | Zusatz)
 #
-# Das ist bewusst NICHT generisch (MVP). Parser später erweitern.
+# Der Parser ist auf dieses Tabellenlayout ausgelegt.
 # ------------------------------------------------------------
 
 import json

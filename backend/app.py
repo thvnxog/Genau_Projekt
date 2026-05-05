@@ -100,7 +100,6 @@ def create_app():
 
         # limit ist optional. Falls nicht gesetzt -> 10.
         # Achtung: int(...) kann bei nicht-numerischen Werten eine ValueError werfen;
-        # für PoC ok, könnte man später robuster machen.
         limit = int(request.args.get("limit") or 10)
 
         if not q:
@@ -149,7 +148,6 @@ def create_app():
 
         Wichtig:
         - Wir mutieren (ändern) das dict in-place und geben es zurück.
-        - Das ist für diesen PoC ok.
         """
 
         # Erwartete Struktur im Plan:
@@ -473,7 +471,6 @@ def create_app():
 
     with app.app_context():
         # Tabellen erstellen, falls noch nicht vorhanden.
-        # Das ist bequem im PoC. In "echten" Projekten macht man Migrationen.
         db.create_all()
 
     # Server starten (debug=True = Auto-Reload + bessere Errors)
@@ -486,8 +483,7 @@ if __name__ == "__main__":
     # Direkt-Start (nur wenn man `python backend/app.py` ausführt)
     app = create_app()
 
-    # Tabellen erstellen, falls noch nicht vorhanden.
-    # Das ist bequem im PoC. In "echten" Projekten macht man Migrationen.
+    # Tabellen anlegen, falls sie noch nicht existieren.
     with app.app_context():
         db.create_all()
 

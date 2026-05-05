@@ -467,9 +467,6 @@ def bls_best_match(
 
     Rückgabe:
     - (best_id, best_name)
-
-    Hinweis:
-    - Das ist bewusst simpel (MVP) und nicht "fuzzy matching" im wissenschaftlichen Sinn.
     """
 
     t, name_col, id_col = detect_table_and_columns(conn)
@@ -556,7 +553,7 @@ def enrich_plan(
         if bls_db_path.exists():
             conn = sqlite3.connect(str(bls_db_path))
         else:
-            print(f"⚠️ BLS DB nicht gefunden: {bls_db_path} (Fallback deaktiviert)")
+            print(f"BLS DB nicht gefunden: {bls_db_path} (Fallback deaktiviert)")
 
     for day in plan.get("days", []):
         for menu in day.get("menus", []):
@@ -665,7 +662,7 @@ def main():
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(enriched, indent=2, ensure_ascii=False), encoding="utf-8")
 
-    print("✅ Enrichment fertig!")
+    print("Enrichment fertig!")
     print(f"Input:  {inp}")
     print(f"Output: {out}")
     print(f"Stats:  {stats}")
