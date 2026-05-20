@@ -213,13 +213,13 @@ pip install pytest
 ### Einzelne Datei testen
 
 ```sh
-.venv/bin/python -m pytest backend/tests/test_parse_foodplan_xlsx.py -q
+.venv/bin/python -m pytest backend/tests/test_parse_foodplan.py -q
 ```
 
 ### Einzelnen Testfall ausführen
 
 ```sh
-.venv/bin/python -m pytest backend/tests/test_parse_foodplan_xlsx.py::test_parse_month_example_groups_into_4_weeks_and_20_days -q
+.venv/bin/python -m pytest backend/tests/test_parse_foodplan.py::test_parse_month_example_groups_into_4_weeks_and_20_days -q
 ```
 
 Aktuell enthalten die Tests u.a. Prüfungen für:
