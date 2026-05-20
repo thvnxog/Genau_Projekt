@@ -8,10 +8,10 @@ BACKEND_DIR = Path(__file__).resolve().parents[1]
 if str(BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(BACKEND_DIR))
 
-from scripts.parse_foodplan_xlsx import (  # noqa: E402
+from scripts.parse_foodplan import (  # noqa: E402
     is_preparation_fragment,
     parse_block,
-    parse_foodplan_xlsx,
+    parse_foodplan,
 )
 
 
@@ -50,7 +50,7 @@ def test_parse_month_example_groups_into_4_weeks_and_20_days():
     project_root = BACKEND_DIR.parent
     xlsx_path = project_root / "data" / "Speiseplan_Beispiel_Monat.xlsx"
 
-    plan = parse_foodplan_xlsx(xlsx_path)
+    plan = parse_foodplan(xlsx_path)
 
     assert len(plan.get("weeks", [])) == 4
     assert len(plan.get("days", [])) == 20

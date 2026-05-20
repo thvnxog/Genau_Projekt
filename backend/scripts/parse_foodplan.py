@@ -1,15 +1,13 @@
-# backend/scripts/parse_foodplan_xlsx.py
+# backend/scripts/parse_foodplan.py
 # ------------------------------------------------------------
-# Speiseplan XLSX (Layout) -> foodplan.json
+# Speiseplan Parser: XLSX (Template) -> foodplan.json
 #
-# Annahmen (aktuelles Template):
-# - Sheet: "Tabelle1"
-# - Spalte 0: Wochentage ("Montag"..."Freitag") markieren Tagesblöcke
-# - Mischkost-Block:   Spalten 1..3  (Name | Gramm | Zusatz)
-# - Vegetarisch-Block: Spalten 4..6  (Name | Gramm | Zusatz)
-# - Dessert-Block:     Spalten 7..9  (Name | Gramm | Zusatz)
-#
-# Der Parser ist auf dieses Tabellenlayout ausgelegt.
+# Dieser Parser akzeptiert weiterhin das projektspezifische Excel-Template
+# (Sheet "Tabelle1", Spalten A..J) und kann als Funktion `parse_foodplan`
+# sowohl mit `Path`- als auch mit file-like-Objekten (z.B. BytesIO) aufgerufen
+# werden. Die Datei entstand durch Umbenennung von parse_foodplan_xlsx.py,
+# um künftig auch alternative Input-Formate (z.B. JSON-wrapping) klar zu
+# unterstützen.
 # ------------------------------------------------------------
 
 import json
@@ -158,9 +156,11 @@ def parse_block(block_df: pd.DataFrame, name_col: int, amount_col: int, notes_co
         if not name and not amount and not notes:
             continue
 
-        # Fortsetzung eines bestehenden Gerichts, wenn in der Gramm-Spalte kein neuer Wert steht.
-        # Damit bleiben mehrzeilige Gerichtsnamen (inkl. Zusatz-Spalte) am gleichen Item hängen.
-        if name and current and not amount:
+        # Fortsetzung eines bestehenden Gerichts, wenn in der Gramm-Spalte kein neuer Wert steht
+        # und das aktuelle Item selbst keine Portionsangabe hat.
+        # Dadurch werden Zeilen wie "mit Tomatensauce" (ohne Gramm) als neues Gericht
+        # interpretiert, wenn das vorherige Gericht bereits eine Portionsangabe besitzt.
+        if name and current and not amount and current.get("portion") is None:
             current["raw_text"] = join_hyphen(current["raw_text"], name)
             if notes:
                 current["notes"].append(notes)
@@ -199,7 +199,7 @@ def parse_block(block_df: pd.DataFrame, name_col: int, amount_col: int, notes_co
     return [it for it in items if it.get("raw_text")]
 
 
-def parse_foodplan_xlsx(xlsx_input: Union[Path, IO[bytes]]) -> dict:
+def parse_foodplan(xlsx_input: Union[Path, IO[bytes]]) -> dict:
     """Parst das XLSX-Template in unser foodplan.json-Format.
 
     `xlsx_input` kann sein:
@@ -323,7 +323,7 @@ if __name__ == "__main__":
     inp = Path(args.inp)
     out = Path(args.out)
 
-    plan = parse_foodplan_xlsx(inp)
+    plan = parse_foodplan(inp)
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(plan, indent=2, ensure_ascii=False), encoding="utf-8")
 

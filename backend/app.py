@@ -195,10 +195,10 @@ def create_app():
         data = f.read()
         bio = io.BytesIO(data)
 
-        from scripts.parse_foodplan_xlsx import parse_foodplan_xlsx
+        from scripts.parse_foodplan import parse_foodplan
 
         try:
-            plan = parse_foodplan_xlsx(bio)
+            plan = parse_foodplan(bio)
         except Exception as e:
             # Parser wirft z.B. RuntimeError bei 0 Items / falschem Template.
             # Wir geben die konkrete Parser-Meldung zurück, damit man das Template gezielt korrigieren kann.
