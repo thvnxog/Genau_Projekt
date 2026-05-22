@@ -124,7 +124,7 @@ export function SelfCheckSection({
             <div className='mt-2 grid gap-3'>
               {(day.menus ?? []).map((menu, menuIdx) => {
                 const missingCount = (menu.items ?? []).filter(
-                  (it) => !it.links?.food_group,
+                  (it) => !it.links?.food_group && !(it.tags ?? []).includes('not_applicable'),
                 ).length;
 
                 const menuKey = `${dayIdx}-${menuIdx}`;
@@ -176,10 +176,11 @@ export function SelfCheckSection({
                       {(menu.items ?? [])
                         .map((it, itemIdx) => ({ it, itemIdx }))
                         .filter(({ it }) =>
-                          showAllForMenu ? true : !it.links?.food_group,
+                          showAllForMenu ? true : (!it.links?.food_group && !(it.tags ?? []).includes('not_applicable')),
                         )
                         .map(({ it, itemIdx }) => {
-                          const recognizedGroup = Boolean(it.links?.food_group);
+                          const isNotApplicable = (it.tags ?? []).includes('not_applicable');
+                          const recognizedGroup = Boolean(it.links?.food_group) || isNotApplicable;
                           const showGroups = showAllForMenu || !recognizedGroup;
 
                           if (!showGroups) return null;
@@ -204,6 +205,27 @@ export function SelfCheckSection({
                                   </div>
 
                                   <div className='flex flex-wrap gap-2'>
+                                    {/* "Keine" Chip – markiert als nicht kategorisierbar */}
+                                    <button
+                                      type='button'
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        toggleItemTag(
+                                          dayIdx,
+                                          menuIdx,
+                                          itemIdx,
+                                          'not_applicable',
+                                        );
+                                      }}
+                                      className={`cursor-pointer rounded-full px-3 py-1.5 text-xs font-semibold transition-all ${
+                                        (it.tags ?? []).includes('not_applicable')
+                                          ? 'ring-2 ring-offset-1 ring-slate-400 bg-red-200 text-red-800'
+                                          : 'opacity-70 hover:opacity-100 bg-slate-100 text-slate-700'
+                                      }`}
+                                    >
+                                      ✕ Keine
+                                    </button>
+
                                     {(
                                       FOOD_GROUPS.filter(Boolean) as Exclude<
                                         FoodGroup,

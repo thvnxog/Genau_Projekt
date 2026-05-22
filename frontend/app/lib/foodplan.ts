@@ -135,6 +135,7 @@ export const RELEVANT_TAGS = [
   'potato_product',
   'raw_veg',
   'whole_fruit',
+  'not_applicable',
 ] as const;
 
 export type RelevantTag = (typeof RELEVANT_TAGS)[number];
@@ -145,6 +146,7 @@ export const TAG_LABELS: Record<RelevantTag, string> = {
   potato_product: 'Kartoffelerzeugnis (z. B. Püree, Kroketten, Pommes)',
   raw_veg: 'Rohkost (ungegart)',
   whole_fruit: 'Stückobst (kein Mus/Saft)',
+  not_applicable: 'Nicht kategorisierbar',
 };
 
 export const FOOD_GROUP_STYLES: Record<

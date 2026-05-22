@@ -221,10 +221,11 @@ export default function Page() {
     for (const d of days) {
       for (const m of d.menus ?? []) {
         for (const it of m.items ?? []) {
+          const hasNotApplicableTag = (it.tags ?? []).includes('not_applicable');
           const hasGroup =
             (Array.isArray(it.food_groups) && it.food_groups.length > 0) ||
             Boolean(it.links?.food_group);
-          if (!hasGroup) n += 1;
+          if (!hasGroup && !hasNotApplicableTag) n += 1;
         }
       }
     }
@@ -263,10 +264,11 @@ export default function Page() {
 
       for (const m of d.menus ?? []) {
         for (const it of m.items ?? []) {
+          const hasNotApplicableTag = (it.tags ?? []).includes('not_applicable');
           const hasGroup =
             (Array.isArray(it.food_groups) && it.food_groups.length > 0) ||
             Boolean(it.links?.food_group);
-          if (!hasGroup) weekMissing += 1;
+          if (!hasGroup && !hasNotApplicableTag) weekMissing += 1;
         }
       }
 
