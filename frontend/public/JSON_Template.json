@@ -1,0 +1,296 @@
+{
+  "schema_version": "1.0",
+  "days": [
+    {
+      "date": null,
+      "weekday": "Montag",
+      "week_index": 0,
+      "week_label": "Woche 1",
+      "menus": [
+        {
+          "menu_type": "mischkost",
+          "items": [
+            {
+              "raw_text": "Hähnchen mit Kartoffeln",
+              "portion": { "value": 250, "unit": "g" },
+              "notes": [],
+              "links": {
+                "bls_id": null,
+                "food_group": null,
+                "confidence": null
+              },
+              "tags": []
+            },
+            {
+              "raw_text": "Salat",
+              "portion": { "value": 100, "unit": "g" },
+              "notes": [],
+              "links": {
+                "bls_id": null,
+                "food_group": null,
+                "confidence": null
+              },
+              "tags": []
+            }
+          ]
+        },
+        {
+          "menu_type": "vegetarisch",
+          "items": [
+            {
+              "raw_text": "Gemüseauflauf",
+              "portion": { "value": 300, "unit": "g" },
+              "notes": [],
+              "links": {
+                "bls_id": null,
+                "food_group": null,
+                "confidence": null
+              },
+              "tags": []
+            }
+          ]
+        },
+        {
+          "menu_type": "dessert",
+          "items": [
+            {
+              "raw_text": "Apfel",
+              "portion": { "value": 150, "unit": "g" },
+              "notes": [],
+              "links": {
+                "bls_id": null,
+                "food_group": null,
+                "confidence": null
+              },
+              "tags": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "date": null,
+      "weekday": "Dienstag",
+      "week_index": 0,
+      "week_label": "Woche 1",
+      "menus": [
+        {
+          "menu_type": "mischkost",
+          "items": [
+            {
+              "raw_text": "Fisch mit Reis",
+              "portion": { "value": 280, "unit": "g" },
+              "notes": [],
+              "links": {
+                "bls_id": null,
+                "food_group": null,
+                "confidence": null
+              },
+              "tags": []
+            }
+          ]
+        },
+        {
+          "menu_type": "vegetarisch",
+          "items": [
+            {
+              "raw_text": "Nudeln mit Tomatensauce",
+              "portion": { "value": 320, "unit": "g" },
+              "notes": [],
+              "links": {
+                "bls_id": null,
+                "food_group": null,
+                "confidence": null
+              },
+              "tags": []
+            }
+          ]
+        },
+        {
+          "menu_type": "dessert",
+          "items": [
+            {
+              "raw_text": "Joghurt",
+              "portion": { "value": 150, "unit": "g" },
+              "notes": [],
+              "links": {
+                "bls_id": null,
+                "food_group": null,
+                "confidence": null
+              },
+              "tags": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "date": null,
+      "weekday": "Mittwoch",
+      "week_index": 0,
+      "week_label": "Woche 1",
+      "menus": [
+        {
+          "menu_type": "mischkost",
+          "items": [
+            {
+              "raw_text": "Schweinbraten mit Kartoffeln",
+              "portion": { "value": 260, "unit": "g" },
+              "notes": [],
+              "links": {
+                "bls_id": null,
+                "food_group": null,
+                "confidence": null
+              },
+              "tags": []
+            }
+          ]
+        },
+        {
+          "menu_type": "vegetarisch",
+          "items": [
+            {
+              "raw_text": "Gemüse-Stir-Fry",
+              "portion": { "value": 300, "unit": "g" },
+              "notes": [],
+              "links": {
+                "bls_id": null,
+                "food_group": null,
+                "confidence": null
+              },
+              "tags": []
+            }
+          ]
+        },
+        {
+          "menu_type": "dessert",
+          "items": [
+            {
+              "raw_text": "Pudding",
+              "portion": { "value": 120, "unit": "g" },
+              "notes": [],
+              "links": {
+                "bls_id": null,
+                "food_group": null,
+                "confidence": null
+              },
+              "tags": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "date": null,
+      "weekday": "Donnerstag",
+      "week_index": 0,
+      "week_label": "Woche 1",
+      "menus": [
+        {
+          "menu_type": "mischkost",
+          "items": [
+            {
+              "raw_text": "Hähnchen-Curry mit Reis",
+              "portion": { "value": 300, "unit": "g" },
+              "notes": [],
+              "links": {
+                "bls_id": null,
+                "food_group": null,
+                "confidence": null
+              },
+              "tags": []
+            }
+          ]
+        },
+        {
+          "menu_type": "vegetarisch",
+          "items": [
+            {
+              "raw_text": "Linsensuppe",
+              "portion": { "value": 350, "unit": "ml" },
+              "notes": [],
+              "links": {
+                "bls_id": null,
+                "food_group": null,
+                "confidence": null
+              },
+              "tags": []
+            }
+          ]
+        },
+        {
+          "menu_type": "dessert",
+          "items": [
+            {
+              "raw_text": "Obstsalat",
+              "portion": { "value": 180, "unit": "g" },
+              "notes": [],
+              "links": {
+                "bls_id": null,
+                "food_group": null,
+                "confidence": null
+              },
+              "tags": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "date": null,
+      "weekday": "Freitag",
+      "week_index": 0,
+      "week_label": "Woche 1",
+      "menus": [
+        {
+          "menu_type": "mischkost",
+          "items": [
+            {
+              "raw_text": "Pizza",
+              "portion": { "value": 250, "unit": "g" },
+              "notes": [],
+              "links": {
+                "bls_id": null,
+                "food_group": null,
+                "confidence": null
+              },
+              "tags": []
+            }
+          ]
+        },
+        {
+          "menu_type": "vegetarisch",
+          "items": [
+            {
+              "raw_text": "Käsespätzle",
+              "portion": { "value": 320, "unit": "g" },
+              "notes": [],
+              "links": {
+                "bls_id": null,
+                "food_group": null,
+                "confidence": null
+              },
+              "tags": []
+            }
+          ]
+        },
+        {
+          "menu_type": "dessert",
+          "items": [
+            {
+              "raw_text": "Eis",
+              "portion": { "value": 100, "unit": "g" },
+              "notes": [],
+              "links": {
+                "bls_id": null,
+                "food_group": null,
+                "confidence": null
+              },
+              "tags": []
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -178,6 +178,25 @@ def create_app():
 
         return plan
 
+    def resolve_bls_db_path(base_dir: Path) -> Path | None:
+        """Liefert den Pfad zur BLS-DB für den Enrichment-Fallback.
+
+        Priorität:
+        1) `BLS_DB_PATH` aus der Umgebung (absolut oder relativ zu `backend/`)
+        2) `backend/instance/bls.db`, falls vorhanden
+        3) `None` (Fallback deaktiviert)
+        """
+
+        env_path = (os.getenv("BLS_DB_PATH") or "").strip()
+        if env_path:
+            p = Path(env_path).expanduser()
+            if not p.is_absolute():
+                p = (base_dir / p).resolve()
+            return p
+
+        default_path = base_dir / "instance" / "bls.db"
+        return default_path if default_path.exists() else None
+
     def build_enriched_plan_from_xlsx_upload(f) -> tuple[dict, dict]:
         """Parst eine hochgeladene XLSX (Template) in-memory und enrich't sie.
 
@@ -230,7 +249,13 @@ def create_app():
         group_keywords = merge_keywords(group_txt, group_json)
         tag_keywords = merge_keywords(tag_txt, tag_json)
 
-        plan, stats = enrich_plan(plan, group_keywords, tag_keywords, bls_db_path=None)
+        bls_db_path = resolve_bls_db_path(base_dir)
+        plan, stats = enrich_plan(
+            plan,
+            group_keywords,
+            tag_keywords,
+            bls_db_path=bls_db_path,
+        )
         plan = normalize_plan(plan)
 
         return plan, stats
