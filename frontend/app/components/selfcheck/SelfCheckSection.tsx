@@ -124,7 +124,9 @@ export function SelfCheckSection({
             <div className='mt-2 grid gap-3'>
               {(day.menus ?? []).map((menu, menuIdx) => {
                 const missingCount = (menu.items ?? []).filter(
-                  (it) => !it.links?.food_group && !(it.tags ?? []).includes('not_applicable'),
+                  (it) =>
+                    !it.links?.food_group &&
+                    !(it.tags ?? []).includes('not_applicable'),
                 ).length;
 
                 const menuKey = `${dayIdx}-${menuIdx}`;
@@ -176,11 +178,17 @@ export function SelfCheckSection({
                       {(menu.items ?? [])
                         .map((it, itemIdx) => ({ it, itemIdx }))
                         .filter(({ it }) =>
-                          showAllForMenu ? true : (!it.links?.food_group && !(it.tags ?? []).includes('not_applicable')),
+                          showAllForMenu
+                            ? true
+                            : !it.links?.food_group &&
+                              !(it.tags ?? []).includes('not_applicable'),
                         )
                         .map(({ it, itemIdx }) => {
-                          const isNotApplicable = (it.tags ?? []).includes('not_applicable');
-                          const recognizedGroup = Boolean(it.links?.food_group) || isNotApplicable;
+                          const isNotApplicable = (it.tags ?? []).includes(
+                            'not_applicable',
+                          );
+                          const recognizedGroup =
+                            Boolean(it.links?.food_group) || isNotApplicable;
                           const showGroups = showAllForMenu || !recognizedGroup;
 
                           if (!showGroups) return null;
@@ -218,7 +226,9 @@ export function SelfCheckSection({
                                         );
                                       }}
                                       className={`cursor-pointer rounded-full px-3 py-1.5 text-xs font-semibold transition-all ${
-                                        (it.tags ?? []).includes('not_applicable')
+                                        (it.tags ?? []).includes(
+                                          'not_applicable',
+                                        )
                                           ? 'ring-2 ring-offset-1 ring-slate-400 bg-red-200 text-red-800'
                                           : 'opacity-70 hover:opacity-100 bg-slate-100 text-slate-700'
                                       }`}
