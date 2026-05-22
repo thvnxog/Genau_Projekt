@@ -5,9 +5,7 @@
 # Dieser Parser akzeptiert weiterhin das projektspezifische Excel-Template
 # (Sheet "Tabelle1", Spalten A..J) und kann als Funktion `parse_foodplan`
 # sowohl mit `Path`- als auch mit file-like-Objekten (z.B. BytesIO) aufgerufen
-# werden. Die Datei entstand durch Umbenennung von parse_foodplan_xlsx.py,
-# um künftig auch alternative Input-Formate (z.B. JSON-wrapping) klar zu
-# unterstützen.
+# werden.
 # ------------------------------------------------------------
 
 import json
@@ -213,8 +211,8 @@ def parse_foodplan(xlsx_input: Union[Path, IO[bytes]]) -> dict:
         xlsx_input,
         sheet_name="Tabelle1",
         header=None,
-        usecols="A:J",      # nur 0..9 (genau deine Blöcke)
-        nrows=400,          # reicht locker fürs Template
+        usecols="A:J",      # nur 0..9 (genau die Blöcke)
+        nrows=400,          # reicht fürs Template
         engine="openpyxl"   # explizit, damit es stabil ist
     )
 

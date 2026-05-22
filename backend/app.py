@@ -18,6 +18,7 @@ Hinweis:
 import os
 import io
 import json
+import logging
 from pathlib import Path
 from collections import defaultdict
 
@@ -35,6 +36,16 @@ from models import db, Food
 
 # .env laden (optional). Falls keine .env existiert, passiert nichts.
 load_dotenv()
+
+
+if not logging.getLogger().handlers:
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+    )
+
+
+logger = logging.getLogger(__name__)
 
 
 def normalize_school_level(raw_value) -> str | None:
@@ -73,12 +84,17 @@ def create_app():
 
     # DB mit der App verbinden (Initialisierung von Flask-SQLAlchemy)
     db.init_app(app)
+    logger.debug(
+        "Initialized SQLAlchemy with database URI %s",
+        app.config["SQLALCHEMY_DATABASE_URI"],
+    )
 
     # --- API Endpunkte -----------------------------------------------------------
 
     @app.get("/health")
     def health():
         """Kleiner Health-Check: zeigt, ob der Server läuft."""
+        logger.debug("Health check requested")
         return {"status": "ok"}
 
     @app.get("/foods")
@@ -101,6 +117,8 @@ def create_app():
         # limit ist optional. Falls nicht gesetzt -> 10.
         # Achtung: int(...) kann bei nicht-numerischen Werten eine ValueError werfen;
         limit = int(request.args.get("limit") or 10)
+
+        logger.info("Food search requested q=%r limit=%s", q, limit)
 
         if not q:
             return {"items": []}
@@ -128,8 +146,10 @@ def create_app():
         # .get(...) liest nach Primärschlüssel.
         item = Food.query.get(food_id)
         if not item:
+            logger.warning("Food not found for id=%s", food_id)
             abort(404, description="Food not found")
 
+        logger.debug("Food details requested for id=%s", food_id)
         return item.to_dict()
 
     # --- Hilfsfunktionen für /api/analyze --------------------------------------
@@ -211,6 +231,8 @@ def create_app():
         if suffix != ".xlsx":
             abort(400, description="Bitte eine .xlsx Datei im Template hochladen.")
 
+        logger.info("Received XLSX upload filename=%s", filename)
+
         data = f.read()
         bio = io.BytesIO(data)
 
@@ -222,6 +244,7 @@ def create_app():
             # Parser wirft z.B. RuntimeError bei 0 Items / falschem Template.
             # Wir geben die konkrete Parser-Meldung zurück, damit man das Template gezielt korrigieren kann.
             detail = str(e).strip() or "Unbekannter Parser-Fehler."
+            logger.warning("XLSX parse failed for %s: %s", filename, detail)
             abort(
                 400,
                 description=(
@@ -242,6 +265,8 @@ def create_app():
         keywords_root = base_dir / "rules" / "keywords"
         mapping_json = base_dir / "rules" / "bls_to_dge_groups.json"
 
+        logger.debug("Loading enrichment keywords from %s", keywords_root)
+
         group_txt = load_keyword_files(keywords_root / "groups")
         tag_txt = load_keyword_files(keywords_root / "tags")
         group_json, tag_json = load_json_mapping(mapping_json)
@@ -258,6 +283,11 @@ def create_app():
         )
         plan = normalize_plan(plan)
 
+        logger.info(
+            "XLSX plan enriched filename=%s",
+            filename,
+        )
+
         return plan, stats
 
     def build_plan_from_json_upload(f) -> tuple[dict, dict]:
@@ -272,6 +302,7 @@ def create_app():
             payload = json.load(f.stream)
         except Exception as e:
             detail = str(e).strip() or "Ungueltiges JSON."
+            logger.warning("JSON upload parse failed: %s", detail)
             abort(
                 400,
                 description=(
@@ -300,6 +331,7 @@ def create_app():
                 ),
             )
 
+        logger.info("Received JSON plan upload with %d days", len(plan.get("days", [])))
         return normalize_plan(plan), {"source": "json_upload"}
 
     def build_plan_from_upload(f) -> tuple[dict, dict]:
@@ -307,6 +339,8 @@ def create_app():
 
         filename = secure_filename(f.filename or "upload.xlsx")
         suffix = Path(filename).suffix.lower()
+
+        logger.debug("Dispatching upload filename=%s suffix=%s", filename, suffix)
 
         if suffix == ".xlsx":
             return build_enriched_plan_from_xlsx_upload(f)
@@ -335,6 +369,12 @@ def create_app():
         if school_level is None:
             abort(400, description="school_level muss 'P' oder 'S' sein.")
 
+        logger.info(
+            "Preview request received school_level=%s filename=%s",
+            school_level,
+            secure_filename(f.filename or "upload"),
+        )
+
         plan, stats = build_plan_from_upload(f)
 
         return {
@@ -359,6 +399,9 @@ def create_app():
 
         plan = None
         school_level = None
+        request_mode = "json" if request.is_json else "upload"
+
+        logger.info("Analyze request received mode=%s", request_mode)
 
         # (A) JSON-Body mit korrigiertem Plan
         if request.is_json:
@@ -367,6 +410,10 @@ def create_app():
             school_level = normalize_school_level(body.get("school_level"))
             if isinstance(candidate, dict):
                 plan = normalize_plan(candidate)
+                logger.debug(
+                    "Analyze request accepted JSON plan with %d days",
+                    len(plan.get("days", [])),
+                )
 
         # (B) Fallback: Datei-Upload
         if plan is None:
@@ -375,6 +422,10 @@ def create_app():
                 abort(400, description="Kein Upload unter 'file' gefunden.")
             school_level = normalize_school_level(request.form.get("school_level"))
             plan, _stats = build_plan_from_upload(f)
+            logger.debug(
+                "Analyze request parsed upload with %d days",
+                len(plan.get("days", [])),
+            )
 
         if school_level is None:
             abort(400, description="school_level muss 'P' oder 'S' sein.")
@@ -384,8 +435,11 @@ def create_app():
         # Regeln laden (robust, relativ zu backend/)
         rules_path = base_dir / "rules" / "dge_lunch_rules.json"
         if not rules_path.exists():
+            logger.error("Rules file missing at %s", rules_path)
             abort(500, description="rules/dge_lunch_rules.json nicht gefunden (Pfad prüfen).")
         rules_doc = json.loads(rules_path.read_text(encoding="utf-8"))
+
+        logger.debug("Loaded rules document from %s", rules_path)
 
         from scripts.evaluate_foodplan import evaluate_plan_for_diet
 
@@ -441,6 +495,7 @@ def create_app():
             }
 
         week_plans = split_plan_into_week_plans(plan)
+        logger.info("Analyze request produced %d week plan(s)", len(week_plans))
 
         # Klassischer Modus (eine Woche)
         if len(week_plans) <= 1:
@@ -484,6 +539,8 @@ def create_app():
             ),
         }
 
+        logger.info("Monthly analysis completed weeks=%d", len(weekly_reports))
+
         return {
             "schema_version": "1.0",
             "mode": "monthly_dual",
@@ -498,9 +555,6 @@ def create_app():
         # Tabellen erstellen, falls noch nicht vorhanden.
         db.create_all()
 
-    # Server starten (debug=True = Auto-Reload + bessere Errors)
-    app.run(host="127.0.0.1", port=5000, debug=True)
-
     return app
 
 
@@ -508,9 +562,5 @@ if __name__ == "__main__":
     # Direkt-Start (nur wenn man `python backend/app.py` ausführt)
     app = create_app()
 
-    # Tabellen anlegen, falls sie noch nicht existieren.
-    with app.app_context():
-        db.create_all()
-
-    # Server starten (debug=True = Auto-Reload + bessere Errors)
+    logger.info("Starting Flask backend on http://127.0.0.1:5000")
     app.run(host="127.0.0.1", port=5000, debug=True)
