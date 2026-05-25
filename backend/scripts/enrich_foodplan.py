@@ -4,9 +4,10 @@ Enrichment-Skript für `foodplan.json`.
 
 Ziel:
 - Aus freiem Text (`item.raw_text`) sollen strukturierte Signale abgeleitet werden:
-  - `item.links.food_group`  (z.B. "vegetables", "meat", ...)
-  - `item.tags`              (z.B. "raw_veg", "fish", ...)
-  - außerdem ein Confidence-Score
+  - `item.food_groups`        (Liste von Strings, z.B. ["meat"] oder [])
+  - `item.links.food_group`   (String, Fallback für Backward-Kompatibilität)
+  - `item.tags`               (Liste: "raw_veg", "fish", "wholegrain", etc.)
+  - außerdem ein Confidence-Score im `item.links`
 
 Wie passiert das?
 1) Text-Normalisierung + Tokenisierung
@@ -25,6 +26,9 @@ Output:
 
 Erwartetes Item-Format im Plan:
   { "raw_text": "...", "links": {...}, "tags": [...] }
+
+Output-Format nach Enrichment:
+  { "raw_text": "...", "food_groups": [...], "links": {"food_group": "...", "confidence": 0.5}, "tags": [...] }
 
 CLI Beispiel:
   python3 backend/scripts/enrich_foodplan.py \
@@ -533,7 +537,14 @@ def enrich_plan(
     Für jedes Item:
     1) Keyword-Matching über raw_text
     2) optional: BLS-Fallback, falls keine Gruppe gefunden wurde
-    3) Ergebnis in `item.links` und `item.tags` zurückschreiben
+    3) Ergebnis wird geschrieben:
+       - `item.food_groups` (Liste): Automatisch erkannte Lebensmittelgruppe(n)
+       - `item.links.food_group` (String): Backward-Kompatibilität (erste Gruppe)
+       - `item.links.confidence` (Float): Vertrauensmaß für das Match (0.0–1.0)
+       - `item.tags` (Liste): Tags (Rohkost, Vollkorn, Kartoffelerzeugnis, etc.)
+
+    Hinweis: Benutzermanuelle Korrektionen im Frontend können `food_groups` 
+    zu mehreren Werten erweitern — diese werden dann bei der Evaluation berücksichtigt.
 
     Rückgabe:
     - (enriched_plan, stats)
@@ -584,6 +595,14 @@ def enrich_plan(
 
                 # 3) writeback: Ergebnisse ins Item schreiben
                 links = item.get("links") or {}
+                
+                # Multi-Gruppen-Struktur: food_groups als Liste
+                if group_res.key:
+                    item["food_groups"] = [group_res.key]
+                else:
+                    item["food_groups"] = []
+                
+                # Für Backward-Kompatibilität: auch Single-Group setzen
                 links["food_group"] = group_res.key
                 links["confidence"] = group_res.score
 

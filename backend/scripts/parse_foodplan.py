@@ -3,9 +3,19 @@
 # Speiseplan Parser: XLSX (Template) -> foodplan.json
 #
 # Dieser Parser akzeptiert weiterhin das projektspezifische Excel-Template
-# (Sheet "Tabelle1", Spalten A..J) und kann als Funktion `parse_foodplan`
-# sowohl mit `Path`- als auch mit file-like-Objekten (z.B. BytesIO) aufgerufen
-# werden.
+# (Sheet "Tabelle1", Spalten A..J) und erzeugt eine hierarchische JSON-Struktur.
+#
+# Output-Format:
+# - Plan mit Tagen und Menüs (Mischkost, Vegetarisch, Dessert)
+# - Jedes Item enthält:
+#   - raw_text (Beschreibung)
+#   - portion (Menge in g/ml)
+#   - food_groups (leeres Array; wird später durch Enrichment gefüllt)
+#   - links (mit food_group, confidence, optional bls_id)
+#   - tags (Rohkost, Vollkorn, etc.; wird später gefüllt)
+#
+# Der Parser kann mit `Path`- als auch mit file-like-Objekten (z.B. BytesIO) 
+# aufgerufen werden.
 # ------------------------------------------------------------
 
 import json
@@ -181,6 +191,7 @@ def parse_block(block_df: pd.DataFrame, name_col: int, amount_col: int, notes_co
                 "raw_text": name,
                 "portion": parse_amount(amount),
                 "notes": [notes] if notes else [],
+                "food_groups": [],  # wird später von Enrichment gefüllt
                 "links": {"bls_id": None, "food_group": None, "confidence": None},
                 "tags": []
             }
