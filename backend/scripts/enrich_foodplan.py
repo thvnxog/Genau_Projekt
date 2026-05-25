@@ -400,6 +400,30 @@ def pick_best_group(raw_text: str, group_keywords: Dict[str, List[str]]) -> Matc
     return MatchResult(best_key, score, best_hits)
 
 
+def pick_matching_groups(
+    raw_text: str, group_keywords: Dict[str, List[str]]
+) -> List[MatchResult]:
+    """Ermittelt alle DGE-Gruppen, die für `raw_text` mindestens einen Treffer haben.
+
+    Die Ergebnisse werden nach Trefferstärke sortiert, damit das erste Element
+    als primäre Gruppe verwendet werden kann.
+    """
+
+    tokens = tokenize(raw_text)
+    matches: List[MatchResult] = []
+
+    for group, kws in group_keywords.items():
+        if not kws:
+            continue
+        hits = score_keywords(raw_text, tokens, kws)
+        if hits > 0:
+            score = min(1.0, hits / max(1, len(kws)))
+            matches.append(MatchResult(group, score, hits))
+
+    matches.sort(key=lambda result: (-result.hits, -result.score, result.key or ""))
+    return matches
+
+
 def collect_tags(raw_text: str, tag_keywords: Dict[str, List[str]]) -> List[str]:
     """Sammelt alle Tags, deren Keyword-Liste mindestens einen Hit hat."""
 
@@ -534,14 +558,14 @@ def enrich_plan(
 ) -> Tuple[dict, dict]:
     """Enriched den gesamten Plan.
 
-    Für jedes Item:
-    1) Keyword-Matching über raw_text
-    2) optional: BLS-Fallback, falls keine Gruppe gefunden wurde
-    3) Ergebnis wird geschrieben:
-       - `item.food_groups` (Liste): Automatisch erkannte Lebensmittelgruppe(n)
-       - `item.links.food_group` (String): Backward-Kompatibilität (erste Gruppe)
-       - `item.links.confidence` (Float): Vertrauensmaß für das Match (0.0–1.0)
-       - `item.tags` (Liste): Tags (Rohkost, Vollkorn, Kartoffelerzeugnis, etc.)
+     Für jedes Item:
+     1) Keyword-Matching über raw_text
+     2) optional: BLS-Fallback, falls keine Gruppe gefunden wurde
+     3) Ergebnis wird geschrieben:
+         - `item.food_groups` (Liste): Automatisch erkannte Lebensmittelgruppe(n)
+         - `item.links.food_group` (String): Backward-Kompatibilität (erste Gruppe)
+         - `item.links.confidence` (Float): Vertrauensmaß für das primäre Match (0.0–1.0)
+         - `item.tags` (Liste): Tags (Rohkost, Vollkorn, Kartoffelerzeugnis, etc.)
 
     Hinweis: Benutzermanuelle Korrektionen im Frontend können `food_groups` 
     zu mehreren Werten erweitern — diese werden dann bei der Evaluation berücksichtigt.
@@ -573,7 +597,8 @@ def enrich_plan(
                 raw = item.get("raw_text", "") or ""
 
                 # 1) normaler Keyword-Match
-                group_res = pick_best_group(raw, group_keywords)
+                group_matches = pick_matching_groups(raw, group_keywords)
+                group_res = group_matches[0] if group_matches else MatchResult(None, 0.0, 0)
                 tags = collect_tags(raw, tag_keywords)
 
                 # 2) optional BLS-Fallback, wenn keine Gruppe gefunden
@@ -587,7 +612,8 @@ def enrich_plan(
                         bls_id, bls_name = bls_best_match(conn, raw)
                         if bls_name:
                             # Versuch nochmal über BLS-Name zu mappen
-                            group_res = pick_best_group(bls_name, group_keywords)
+                            group_matches = pick_matching_groups(bls_name, group_keywords)
+                            group_res = group_matches[0] if group_matches else MatchResult(None, 0.0, 0)
                             tags = sorted(
                                 set(tags + collect_tags(bls_name, tag_keywords))
                             )
@@ -596,14 +622,11 @@ def enrich_plan(
                 # 3) writeback: Ergebnisse ins Item schreiben
                 links = item.get("links") or {}
                 
-                # Multi-Gruppen-Struktur: food_groups als Liste
-                if group_res.key:
-                    item["food_groups"] = [group_res.key]
-                else:
-                    item["food_groups"] = []
+                # Multi-Gruppen-Struktur: alle passenden Gruppen als Liste
+                item["food_groups"] = [match.key for match in group_matches if match.key]
                 
                 # Für Backward-Kompatibilität: auch Single-Group setzen
-                links["food_group"] = group_res.key
+                links["food_group"] = item["food_groups"][0] if item["food_groups"] else None
                 links["confidence"] = group_res.score
 
                 # Falls BLS benutzt wurde, behalten wir Debug-Infos
