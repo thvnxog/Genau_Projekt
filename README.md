@@ -193,7 +193,12 @@ Dann:
 
 ## 7) Tests (Unit Tests)
 
-Für die ersten Backend-Unit-Tests verwenden wir `pytest`.
+Für die Tests verwenden wir aktuell zwei Werkzeuge:
+
+- `pytest` für das Backend
+- `vitest` für das Frontend
+
+### Backend-Tests starten
 
 ### Einmalig installieren
 
@@ -227,6 +232,43 @@ Aktuell enthalten die Tests u.a. Prüfungen für:
 - Erkennung von Zubereitungsfragmenten (`ueberbacken`, `frittiert`, ...)
 - korrektes Zusammenführen von Fortsetzungszeilen
 - Monatsbeispiel-Datei mit 4 Wochen / 20 Tagen
+
+### Backend-Coverage anzeigen
+
+```sh
+.venv/bin/python -m pytest backend/tests --cov=backend --cov-report=term-missing
+```
+
+### Frontend-Tests starten
+
+Im Frontend-Ordner:
+
+```sh
+cd frontend
+npm install
+npm test -- --coverage
+```
+
+Alternativ direkt aus dem Projekt-Root:
+
+```sh
+npm --prefix frontend test -- --coverage
+```
+
+Der Frontend-Testlauf prüft aktuell unter anderem:
+
+- die Upload- und Hilfekomponente
+- den Selbstcheck-Flow
+- die Report-Anzeige
+- die Next.js-Proxy-Routen `/api/preview` und `/api/analyze`
+
+### Alle Tests zusammen
+
+Wenn Backend und Frontend direkt nacheinander ausführen willst:
+
+```sh
+.venv/bin/python -m pytest backend/tests -q && npm --prefix frontend test -- --coverage
+```
 
 ## 8) Konfiguration (Umgebungsvariablen)
 
