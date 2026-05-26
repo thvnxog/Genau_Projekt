@@ -46,6 +46,7 @@ PREPARATION_FRAGMENT_STEMS = {
     "marinier",
     "wuerz",
     "würz",
+    "ueberback",
 }
 
 
