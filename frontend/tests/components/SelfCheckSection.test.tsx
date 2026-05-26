@@ -23,6 +23,7 @@ const day = {
 };
 
 test('selfcheck section exposes group chips and update action', () => {
+  // Im Selbstcheck werden Lebensmittelgruppen manuell ausgewählt und anschließend neu berechnet.
   const toggleItemFoodGroup = vi.fn();
   const toggleItemTag = vi.fn();
   const setOpenMenus = vi.fn();

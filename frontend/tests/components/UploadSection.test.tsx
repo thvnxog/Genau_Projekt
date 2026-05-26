@@ -6,6 +6,7 @@ import { vi } from 'vitest';
 import { UploadSection } from '../../app/components/upload/UploadSection';
 
 function renderUploadSection(file: File | null = null) {
+  // Hilfsfunktion: rendert die Komponente mit allen benötigten Mock-Callbacks.
   const fileInputRef = createRef<HTMLInputElement>();
   fileInputRef.current = {
     click: vi.fn(),
@@ -39,6 +40,7 @@ function renderUploadSection(file: File | null = null) {
 }
 
 test('upload section opens help modal and exposes template links', () => {
+  // Die Upload-Seite soll Hilfe, Vorlagen und die Stufenwahl sichtbar machen.
   renderUploadSection();
 
   fireEvent.click(screen.getByRole('button', { name: /hilfe/i }));
@@ -59,6 +61,7 @@ test('upload section opens help modal and exposes template links', () => {
 });
 
 test('upload section allows school selection and file removal', () => {
+  // Nach der Dateiauswahl sollen Stufe und Entfernen-Button korrekt reagieren.
   const file = new File(['demo'], 'plan.xlsx', {
     type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
   });

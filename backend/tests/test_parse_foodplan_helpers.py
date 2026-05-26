@@ -11,6 +11,7 @@ from scripts.parse_foodplan import (
 
 
 def test_norm_cell_and_week_header_helpers():
+    # Kleine Hilfsfunktionen sollen leere Zellen und Wochenüberschriften korrekt erkennen.
     assert norm_cell(None) is None
     assert norm_cell(float("nan")) is None
     assert norm_cell("  Montag ") == "Montag"
@@ -19,6 +20,7 @@ def test_norm_cell_and_week_header_helpers():
 
 
 def test_extract_week_label_and_join_hyphen():
+    # Wochenlabel und Zeilenumbrüche werden für lesbare Pläne bereinigt.
     assert extract_week_label(None, 2) == "Woche 3"
     assert extract_week_label("  Speiseplan   vom  12.01.2026  ", 0) == (
         "Speiseplan vom 12.01.2026"
@@ -28,6 +30,7 @@ def test_extract_week_label_and_join_hyphen():
 
 
 def test_parse_amount_and_preparation_fragment_detection():
+    # Mengenangaben und reine Zubereitungswörter werden separat erkannt.
     assert parse_amount(200) == {"value": 200.0, "unit": "g"}
     assert parse_amount("200") == {"value": 200.0, "unit": "g"}
     assert parse_amount("120 ml") == {"value": 120.0, "unit": "ml"}

@@ -4,6 +4,7 @@ import { vi } from 'vitest';
 import Page from '../app/page';
 
 function previewResponse() {
+  // Kleine Beispielantwort für den Preview-Schritt des kompletten Flows.
   return {
     schema_version: '1.0',
     mode: 'preview',
@@ -37,6 +38,7 @@ function previewResponse() {
 }
 
 function analyzeResponse() {
+  // Beispielantwort für die spätere Auswertung des hochgeladenen Plans.
   return {
     schema_version: '1.0',
     mode: 'dual',
@@ -63,6 +65,7 @@ function analyzeResponse() {
 }
 
 test('page drives upload, report and selfcheck flow', async () => {
+  // Testet den kompletten Hauptweg: hochladen, auswerten, korrigieren.
   const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
     const url = typeof input === 'string' ? input : input.toString();
 
@@ -117,6 +120,7 @@ test('page drives upload, report and selfcheck flow', async () => {
 });
 
 test('page shows upload error when school level is missing', async () => {
+  // Ohne gewählte Schulstufe darf die Verarbeitung nicht starten.
   const fetchMock = vi.fn();
   vi.stubGlobal('fetch', fetchMock);
 
@@ -142,6 +146,7 @@ test('page shows upload error when school level is missing', async () => {
 });
 
 test('page navigates from report to selfcheck and back', async () => {
+  // Prüft die Rücksprünge zwischen Report, Selbstcheck und Upload.
   const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
     const url = typeof input === 'string' ? input : input.toString();
 

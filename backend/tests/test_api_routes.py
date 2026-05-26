@@ -4,6 +4,7 @@ from models import Food, db
 
 
 def test_health_and_food_search(client, app):
+    # Prüft zuerst den einfachen Health-Check und danach die Suchfunktion für Lebensmittel.
     with app.app_context():
         db.session.add(Food(name_de="Apfel", energy_kcal=52.0))
         db.session.commit()
@@ -19,6 +20,7 @@ def test_health_and_food_search(client, app):
 
 
 def test_preview_route_returns_enriched_plan(monkeypatch, client):
+    # Die Preview-Route soll den Plan zurückgeben, nachdem Parsing und Enrichment gelaufen sind.
     plan = {
         "schema_version": "1.0",
         "days": [
@@ -74,6 +76,7 @@ def test_preview_route_returns_enriched_plan(monkeypatch, client):
 
 
 def test_preview_route_rejects_missing_or_invalid_upload(client):
+    # Fehlerfälle: kein File oder falsches Dateiformat müssen sauber abgewiesen werden.
     missing_file = client.post(
         "/api/preview",
         data={"school_level": "P"},
@@ -90,6 +93,7 @@ def test_preview_route_rejects_missing_or_invalid_upload(client):
 
 
 def test_analyze_route_accepts_uploaded_json_file(monkeypatch, client):
+    # Die Analyse-Route kann auch einen JSON-Upload direkt verarbeiten.
     def fake_eval(_plan, _rules_doc, selected_diet, school_level=None):
         return {
             "schema_version": "1.0",
@@ -119,6 +123,7 @@ def test_analyze_route_accepts_uploaded_json_file(monkeypatch, client):
 
 
 def test_analyze_route_returns_dual_report_for_single_week(monkeypatch, client):
+    # Ein Wochenplan erzeugt einen Dual-Report für beide Ernährungsformen.
     plan = {
         "schema_version": "1.0",
         "days": [
@@ -159,6 +164,7 @@ def test_analyze_route_returns_dual_report_for_single_week(monkeypatch, client):
 
 
 def test_analyze_route_returns_monthly_report_for_multiple_weeks(monkeypatch, client):
+    # Mehrere Wochen werden als Monatsreport mit Wochenübersicht zurückgegeben.
     plan = {
         "schema_version": "1.0",
         "days": [

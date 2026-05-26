@@ -12,12 +12,14 @@ from scripts.enrich_foodplan import (
 
 
 def test_tokenize_removes_stopwords_and_preparation_words():
+  # Die Tokenisierung soll unwichtige Wörter und Zubereitungsbegriffe entfernen.
     tokens = tokenize("Fisch mit überbacken und Gemüse")
 
     assert tokens == ["fisch", "gemüse"]
 
 
 def test_pick_best_group_and_matching_groups():
+  # Die Matching-Funktionen wählen die beste Gruppe und erkennen mehrere Treffer.
     group_keywords = {
         "fish": ["fisch"],
         "vegetables": ["gemüse"],
@@ -34,6 +36,7 @@ def test_pick_best_group_and_matching_groups():
 
 
 def test_collect_tags_and_keyword_loading(tmp_path):
+  # Keywords werden aus Dateien und JSON geladen und anschließend zu Tags zusammengeführt.
     keywords_root = tmp_path / "keywords"
     groups_dir = keywords_root / "groups"
     tags_dir = keywords_root / "tags"

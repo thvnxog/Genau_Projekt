@@ -1,6 +1,7 @@
 import { POST } from '../../app/api/analyze/route';
 
 test('analyze proxy forwards JSON requests to backend', async () => {
+  // JSON-Anfragen sollen unverändert an das Flask-Backend weitergeleitet werden.
   process.env.BACKEND_URL = 'http://backend';
 
   const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
@@ -27,6 +28,7 @@ test('analyze proxy forwards JSON requests to backend', async () => {
 });
 
 test('analyze proxy forwards multipart uploads to backend', async () => {
+  // Auch Datei-Uploads müssen korrekt an den Analyse-Endpunkt weitergereicht werden.
   process.env.BACKEND_URL = 'http://backend';
 
   const fetchMock = vi.fn(async (url: string) => {

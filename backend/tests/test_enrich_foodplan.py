@@ -4,6 +4,7 @@ from scripts.enrich_foodplan import enrich_plan
 
 
 def build_plan(raw_text: str, portion_value: float = 100.0) -> dict:
+    # Kleines Hilfsobjekt für mehrere Tests: ein Plan mit genau einem Gericht.
     return {
         "schema_version": "1.0",
         "days": [
@@ -34,6 +35,7 @@ def build_plan(raw_text: str, portion_value: float = 100.0) -> dict:
 
 
 def test_enrich_plan_detects_multiple_groups_and_tags():
+    # Ein Gericht kann mehrere Gruppen und Tags gleichzeitig bekommen.
     plan = build_plan("Fisch mit Gemüse und Vollkornbrot")
 
     group_keywords = {
@@ -57,6 +59,7 @@ def test_enrich_plan_detects_multiple_groups_and_tags():
 
 
 def test_enrich_plan_uses_bls_fallback_when_keywords_do_not_match(tmp_path):
+    # Wenn Keywords nicht greifen, versucht das Enrichment die BLS-Datenbank als Fallback.
     plan = build_plan("Pfanne")
 
     group_keywords = {"vegetables": ["gemüse"]}

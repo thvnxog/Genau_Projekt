@@ -1,6 +1,7 @@
 import { POST } from '../../app/api/preview/route';
 
 test('preview proxy forwards multipart upload to backend', async () => {
+  // Die Preview-Route ist nur ein Proxy und soll den Upload an Flask weiterreichen.
   process.env.BACKEND_URL = 'http://backend';
 
   const fetchMock = vi.fn(async (url: string) => {

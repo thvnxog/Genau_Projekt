@@ -5,6 +5,7 @@ import {
 } from '../../app/lib/foodplan';
 
 test('toggle helpers add and remove entries', () => {
+  // Prüft die kleinen Hilfsfunktionen für das Ein- und Ausschalten von Chips.
   expect(toggleFoodGroup([], 'fish')).toEqual(['fish']);
   expect(toggleFoodGroup(['fish'], 'fish')).toEqual([]);
   expect(toggleTag([], 'wholegrain')).toEqual(['wholegrain']);
@@ -12,6 +13,7 @@ test('toggle helpers add and remove entries', () => {
 });
 
 test('getPrimaryFoodGroup prefers multi selection over link fallback', () => {
+  // Wenn mehrere Gruppen gesetzt sind, soll die erste als Hauptgruppe gelten.
   expect(
     getPrimaryFoodGroup({
       food_groups: ['fish', 'vegetables'],

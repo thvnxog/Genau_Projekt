@@ -28,6 +28,7 @@ const baseReport = {
 };
 
 function renderDualReport() {
+  // Baut einen Report mit zwei Ernährungsformen auf, damit die Anzeige getestet werden kann.
   const onGoToSelfcheck = vi.fn();
 
   render(
@@ -49,6 +50,7 @@ function renderDualReport() {
 }
 
 test('report section shows summary cards and selfcheck hint', () => {
+  // Der Report soll Score-Karten und den Hinweis zum Selbstcheck anzeigen.
   const { onGoToSelfcheck } = renderDualReport();
 
   expect(screen.getByText('Ampel-Erklärung')).toBeInTheDocument();
@@ -59,6 +61,7 @@ test('report section shows summary cards and selfcheck hint', () => {
 });
 
 test('report section supports monthly week switching', () => {
+  // Bei Monatsplänen kann der Nutzer zwischen den Wochen umschalten.
   const setActiveWeekIndex = vi.fn();
 
   render(

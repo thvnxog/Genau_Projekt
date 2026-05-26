@@ -4,6 +4,7 @@ import { vi } from 'vitest';
 import { StepNavigation } from '../../app/components/navigation/StepNavigation';
 
 test('step navigation switches labels between upload and report', () => {
+  // Die Navigationsleiste soll je nach Schritt andere Schaltflächen zeigen.
   const onBack = vi.fn();
   const onNext = vi.fn();
 

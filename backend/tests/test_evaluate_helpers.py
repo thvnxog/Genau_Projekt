@@ -9,6 +9,7 @@ from scripts.evaluate_foodplan import (
 
 
 def test_rule_applies_and_evaluate_operator():
+    # Grundfunktionen der Regelprüfung: Gültigkeit und Operatoren.
     assert rule_applies({"diet": "all"}, "mixed") is True
     assert rule_applies({"diet": "mixed"}, "mixed") is True
     assert rule_applies({"diet": "ovo_lacto_vegetarian"}, "mixed") is False
@@ -23,6 +24,7 @@ def test_rule_applies_and_evaluate_operator():
 
 
 def test_count_plan_days_and_threshold_scaling():
+    # Die Schwelle für Mindestwerte wird an die tatsächlich vorhandenen Tage angepasst.
     plan = {
         "days": [
             {

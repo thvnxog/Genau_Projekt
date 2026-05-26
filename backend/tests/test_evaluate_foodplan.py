@@ -2,6 +2,7 @@ from scripts.evaluate_foodplan import evaluate_plan_for_diet, infer_groups_for_i
 
 
 def build_plan() -> dict:
+    # Beispielplan mit mehreren Gerichten, um Zählung und Grammverteilung zu testen.
     return {
         "schema_version": "1.0",
         "days": [
@@ -38,6 +39,7 @@ def build_plan() -> dict:
 
 
 def test_infer_groups_for_item_prefers_multi_groups_and_deduplicates():
+    # Mehrfach vorhandene Gruppen werden bereinigt und nur einmal gezählt.
     item = {
         "food_groups": ["fish", "vegetables", "fish"],
         "links": {"food_group": "vegetables"},
@@ -49,6 +51,7 @@ def test_infer_groups_for_item_prefers_multi_groups_and_deduplicates():
 
 
 def test_evaluate_plan_for_diet_counts_groups_and_builds_gram_hints():
+    # Die Bewertung zählt Gruppen und erzeugt Gramm-Hinweise für Regel-Checks.
     plan = build_plan()
     rules_doc = {
         "scope": {"time_window_days": 5},
