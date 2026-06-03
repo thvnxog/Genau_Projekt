@@ -438,6 +438,40 @@ def collect_tags(raw_text: str, tag_keywords: Dict[str, List[str]]) -> List[str]
     return sorted(set(tags))
 
 
+ADDITIONAL_NOTE_TAG_PATTERNS = {
+    "bio": [r"\bbio\b"],
+    "wholegrain": [r"\bvk\b", r"\bvollkorn\b"],
+    "lean_meat": [r"\bm\b", r"\bmageres muskelfleisch\b", r"\bmager\b"],
+    "fried_or_breaded": [r"\bpf\b", r"\bpaniert\b", r"\bfrittiert\b"],
+    "frozen": [r"\btk\b", r"\btiefk[üu]hl\b", r"\btiefkuehl\b"],
+    "fresh": [r"\bfrisch\b"],
+    "canned": [r"\bkonserve\b", r"\bkonserven\b"],
+}
+
+
+def collect_note_tags(notes: List[str]) -> List[str]:
+    """Leitet Tags aus der Zusatz-/Notizspalte ab.
+
+    Die Excel-Vorlage enthält dort typischerweise kurze Kürzel oder Hinweise
+    wie "Bio", "VK", "M" oder "TK". Diese werden in reguläre Tags
+    überführt, damit die spätere Bewertung unabhängig vom Excel-Format arbeitet.
+    """
+
+    if not notes:
+        return []
+
+    note_text = normalize_text(" ".join(str(note) for note in notes if note))
+    if not note_text:
+        return []
+
+    tags: List[str] = []
+    for tag, patterns in ADDITIONAL_NOTE_TAG_PATTERNS.items():
+        if any(re.search(pattern, note_text) for pattern in patterns):
+            tags.append(tag)
+
+    return sorted(set(tags))
+
+
 # -----------------------------
 # Optional: BLS-Fallback (SQLite)
 # - versucht Tabellen/Spalten automatisch zu finden
@@ -600,6 +634,7 @@ def enrich_plan(
                 group_matches = pick_matching_groups(raw, group_keywords)
                 group_res = group_matches[0] if group_matches else MatchResult(None, 0.0, 0)
                 tags = collect_tags(raw, tag_keywords)
+                tags = sorted(set(tags + collect_note_tags(item.get("notes") or [])))
 
                 # 2) optional BLS-Fallback, wenn keine Gruppe gefunden
                 used_bls = False

@@ -2,6 +2,7 @@ from pathlib import Path
 
 from scripts.enrich_foodplan import (
     collect_tags,
+    collect_note_tags,
     load_json_mapping,
     load_keyword_files,
     merge_keywords,
@@ -77,3 +78,24 @@ def test_collect_tags_and_keyword_loading(tmp_path):
     assert merged_tags == {"raw_veg": ["rohkost"], "wholegrain": ["vollkorn"]}
 
     assert collect_tags("Vollkorn und Rohkost", merged_tags) == ["raw_veg", "wholegrain"]
+
+
+def test_collect_note_tags_maps_excel_additions_to_tags():
+  # Die Zusatzspalte soll typische Kürzel in reguläre Tags übersetzen.
+    notes = [
+        "Bio",
+        "VK: Vollkorn",
+        "M: Mageres Muskelfleisch",
+        "pf: paniert oder frittiert",
+        "TK=Tiefkühl, frisch, Konserve",
+    ]
+
+    assert collect_note_tags(notes) == [
+        "bio",
+        "canned",
+        "fresh",
+        "fried_or_breaded",
+        "frozen",
+      "lean_meat",
+        "wholegrain",
+    ]

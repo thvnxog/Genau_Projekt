@@ -78,6 +78,7 @@ export type PlanItem = {
   links?: { food_group?: string | null };
   tags?: string[];
   food_groups?: string[];
+  notes?: string[];
 };
 
 export type PlanMenu = {
