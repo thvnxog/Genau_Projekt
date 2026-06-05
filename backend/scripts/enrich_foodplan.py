@@ -477,8 +477,9 @@ def collect_note_tags(notes: List[str]) -> List[str]:
 # - versucht Tabellen/Spalten automatisch zu finden
 # -----------------------------
 
-# Heuristiken: mögliche Spaltennamen in der DB
+# mögliche Spaltennamen in der DB
 COMMON_NAME_COLS = [
+    "name_de",
     "Lebensmittelbezeichnung",
     "lebensmittelbezeichnung",
     "name",
@@ -505,6 +506,14 @@ def detect_table_and_columns(
     cur = conn.cursor()
     tables = cur.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()
     tables = [t[0] for t in tables]
+
+    # Unsere importierte BLS-DB nutzt die Tabelle `foods` mit der Namensspalte `name_de`.
+    if "foods" in tables:
+        cols = cur.execute("PRAGMA table_info('foods')").fetchall()
+        colnames = [c[1] for c in cols]
+        if "name_de" in colnames:
+            id_col = next((c for c in colnames if c in COMMON_ID_COLS), None)
+            return "foods", "name_de", id_col
 
     for t in tables:
         cols = cur.execute(f"PRAGMA table_info('{t}')").fetchall()

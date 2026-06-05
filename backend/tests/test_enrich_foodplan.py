@@ -1,6 +1,6 @@
 import sqlite3
 
-from scripts.enrich_foodplan import enrich_plan
+from scripts.enrich_foodplan import detect_table_and_columns, enrich_plan, bls_best_match
 
 
 def build_plan(raw_text: str, portion_value: float = 100.0) -> dict:
@@ -82,3 +82,21 @@ def test_enrich_plan_uses_bls_fallback_when_keywords_do_not_match(tmp_path):
     assert item["links"]["food_group"] == "vegetables"
     assert item["links"]["bls_id"] == 1
     assert item["links"]["bls_name"] == "Gemüsepfanne"
+
+
+def test_bls_fallback_prefers_name_de_column(tmp_path):
+    # Die reale BLS-DB nutzt name_de als Spalte für Lebensmittelbezeichnungen.
+    db_path = tmp_path / "bls.db"
+    conn = sqlite3.connect(db_path)
+    conn.execute("CREATE TABLE foods (id INTEGER PRIMARY KEY, name_de TEXT)")
+    conn.execute(
+        "INSERT INTO foods (id, name_de) VALUES (?, ?)",
+        (7, "Pizza Salame (mit Tomatensauce, Mozzarella, Salami)"),
+    )
+    conn.commit()
+
+    assert detect_table_and_columns(conn) == ("foods", "name_de", "id")
+    assert bls_best_match(conn, "pizza salame") == (
+        7,
+        "Pizza Salame (mit Tomatensauce, Mozzarella, Salami)",
+    )
