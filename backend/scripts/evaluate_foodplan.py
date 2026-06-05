@@ -488,6 +488,13 @@ def build_gram_hint(rule_result: dict) -> dict:
 
     current = float(rule_result.get("actual", 0) or 0)
     target_value = float(rule_result.get("threshold", 0) or 0)
+    operator = rule_result.get("operator")
+
+    if operator == "max":
+        status = "too_much" if current > target_value else "ok"
+    else:
+        status = "needs_more" if current < target_value else "ok"
+
     missing = max(0.0, round(target_value - current, 2))
 
     return {
@@ -497,7 +504,7 @@ def build_gram_hint(rule_result: dict) -> dict:
         "current_grams": round(current, 2),
         "target_grams": round(target_value, 2),
         "missing_grams": missing,
-        "status": "ok" if missing <= 0 else "needs_more",
+        "status": status,
     }
 
 

@@ -22,7 +22,7 @@ export type GramHint = {
   current_grams: number;
   target_grams: number;
   missing_grams: number;
-  status: 'ok' | 'needs_more';
+  status: 'ok' | 'needs_more' | 'too_much';
 };
 
 export type ReportSingle = {

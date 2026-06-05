@@ -84,6 +84,35 @@ export function RulesList({
     return ruleValues.some((v) => hintValues.includes(v));
   }
 
+  function getGramHintBadge(hint: GramHint) {
+    if (hint.status === 'needs_more') {
+      return {
+        icon: '⚠️',
+        className: 'border-amber-200 bg-amber-50 text-amber-900',
+        suffix: <>&nbsp;· noch <b>{hint.missing_grams.toFixed(1)} g</b></>,
+      };
+    }
+
+    if (hint.status === 'too_much') {
+      return {
+        icon: '⚠️',
+        className: 'border-rose-200 bg-rose-50 text-rose-900',
+        suffix: (
+          <>
+            &nbsp;· <b>{(hint.current_grams - hint.target_grams).toFixed(1)} g</b>{' '}
+            zu viel
+          </>
+        ),
+      };
+    }
+
+    return {
+      icon: '',
+      className: 'border-slate-200 bg-white text-slate-700',
+      suffix: null,
+    };
+  }
+
   return (
     <div className='mt-2 grid gap-2'>
       {rules.map((r: RuleResult) => {
@@ -133,18 +162,17 @@ export function RulesList({
                 {relatedHints.map((h) => (
                   <span
                     key={h.id}
-                    className='rounded bg-white px-1.5 py-0.5 border border-slate-200'
+                    className={`rounded px-1.5 py-0.5 border ${getGramHintBadge(h).className}`}
                   >
+                    {getGramHintBadge(h).icon ? (
+                      <span className='mr-1'>{getGramHintBadge(h).icon}</span>
+                    ) : null}
                     Gramm:{' '}
                     <b>
                       {h.current_grams.toFixed(1)} / {h.target_grams.toFixed(1)}{' '}
                       g
                     </b>
-                    {h.missing_grams > 0 ? (
-                      <>
-                        {' · '}noch <b>{h.missing_grams.toFixed(1)} g</b>
-                      </>
-                    ) : null}
+                    {getGramHintBadge(h).suffix}
                   </span>
                 ))}
               </div>

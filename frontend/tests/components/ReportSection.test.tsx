@@ -5,13 +5,24 @@ import { ReportSection } from '../../app/components/report/ReportSection';
 
 const baseReport = {
   summary: { score: 0.5, passed_rules: 1, applicable_rules: 2 },
-  gram_hints: [],
+  gram_hints: [
+    {
+      id: 'veg-grams',
+      label: 'Gemüse in Gramm',
+      target: { count_by: 'food_group_grams', value: 'vegetables' },
+      current_grams: 50,
+      target_grams: 60,
+      missing_grams: 10,
+      status: 'too_much',
+    },
+  ],
   rules: [
     {
       id: 'rule-1',
       label: 'Fisch ist vorhanden',
       applies: true,
       passed: true,
+      target: { count_by: 'food_group', value: 'fish' },
       expected: 'mind. 1',
       actual: 1,
     },
@@ -19,7 +30,8 @@ const baseReport = {
       id: 'rule-2',
       label: 'Gemüse ist vorhanden',
       applies: true,
-      passed: false,
+      passed: true,
+      target: { count_by: 'food_group', value: 'vegetables' },
       expected: 'mind. 2',
       actual: 1,
       notes: 'Noch ein Gemüsegericht ergänzen.',

@@ -89,3 +89,26 @@ def test_evaluate_plan_for_diet_counts_groups_and_builds_gram_hints():
     assert report["gram_hints"][0]["id"] == "veg-grams"
     assert report["gram_hints"][0]["target_grams"] == 60.0
     assert report["gram_hints"][0]["missing_grams"] == 10.0
+    assert report["gram_hints"][0]["status"] == "needs_more"
+
+
+def test_evaluate_plan_for_diet_marks_gram_hints_when_target_is_exceeded():
+    # Bei Gramm-Regeln vom Typ max soll ein Überschreiten als Warnung sichtbar sein.
+    plan = build_plan()
+    rules_doc = {
+        "scope": {"time_window_days": 5},
+        "rules": [
+            {
+                "id": "veg-grams-max",
+                "label": "Gemüse in Gramm",
+                "diet": "all",
+                "target": {"count_by": "food_group_grams", "value": "vegetables"},
+                "operator": "max",
+                "threshold": 40,
+            },
+        ],
+    }
+
+    report = evaluate_plan_for_diet(plan, rules_doc, "mixed", school_level="P")
+
+    assert report["gram_hints"][0]["status"] == "too_much"
