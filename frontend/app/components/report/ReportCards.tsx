@@ -89,7 +89,11 @@ export function RulesList({
       return {
         icon: '⚠️',
         className: 'border-amber-200 bg-amber-50 text-amber-900',
-        suffix: <>&nbsp;· noch <b>{hint.missing_grams.toFixed(1)} g</b></>,
+        suffix: (
+          <>
+            &nbsp;· noch <b>{hint.missing_grams.toFixed(1)} g</b>
+          </>
+        ),
       };
     }
 
@@ -99,8 +103,9 @@ export function RulesList({
         className: 'border-rose-200 bg-rose-50 text-rose-900',
         suffix: (
           <>
-            &nbsp;· <b>{(hint.current_grams - hint.target_grams).toFixed(1)} g</b>{' '}
-            zu viel
+            &nbsp;·{' '}
+            <b>{(hint.current_grams - hint.target_grams).toFixed(1)} g</b> zu
+            viel
           </>
         ),
       };
