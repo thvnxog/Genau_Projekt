@@ -112,3 +112,25 @@ def test_evaluate_plan_for_diet_marks_gram_hints_when_target_is_exceeded():
     report = evaluate_plan_for_diet(plan, rules_doc, "mixed", school_level="P")
 
     assert report["gram_hints"][0]["status"] == "too_much"
+
+
+def test_evaluate_plan_for_diet_marks_min_gram_hints_when_target_is_exceeded():
+    # Auch Mindest-Regeln sollen bei Überschreiten als Warnung markiert werden.
+    plan = build_plan()
+    rules_doc = {
+        "scope": {"time_window_days": 5},
+        "rules": [
+            {
+                "id": "veg-grams-min",
+                "label": "Gemüse in Gramm",
+                "diet": "all",
+                "target": {"count_by": "food_group_grams", "value": "vegetables"},
+                "operator": "min",
+                "threshold": 40,
+            },
+        ],
+    }
+
+    report = evaluate_plan_for_diet(plan, rules_doc, "mixed", school_level="P")
+
+    assert report["gram_hints"][0]["status"] == "too_much"

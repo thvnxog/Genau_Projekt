@@ -488,12 +488,12 @@ def build_gram_hint(rule_result: dict) -> dict:
 
     current = float(rule_result.get("actual", 0) or 0)
     target_value = float(rule_result.get("threshold", 0) or 0)
-    operator = rule_result.get("operator")
-
-    if operator == "max":
-        status = "too_much" if current > target_value else "ok"
+    if current > target_value:
+        status = "too_much"
+    elif current < target_value:
+        status = "needs_more"
     else:
-        status = "needs_more" if current < target_value else "ok"
+        status = "ok"
 
     missing = max(0.0, round(target_value - current, 2))
 
