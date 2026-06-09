@@ -233,6 +233,37 @@ Aktuell enthalten die Tests u.a. Prüfungen für:
 - korrektes Zusammenführen von Fortsetzungszeilen
 - Monatsbeispiel-Datei mit 4 Wochen / 20 Tagen
 
+### Quantitativer BLS-Test
+
+Wenn man messen will, wie gut die aktuelle Enrichment-Logik BLS-Gerichte erkennt, kann man das CLI-Skript ausführen:
+
+```sh
+cd backend
+./.venv/bin/python scripts/quantitative_bls_eval.py --all --seed 42
+```
+
+Optional kannst du nur eine Teilmenge testen:
+
+```sh
+cd backend
+./.venv/bin/python scripts/quantitative_bls_eval.py --sample-size 200 --seed 42
+```
+
+Das Skript loggt im Terminal u.a.:
+
+- Gesamtzahl der getesteten Gerichte
+- direkt erkannte Gerichte vor dem BLS-Fallback
+- final erkannte Gerichte inkl. BLS-Fallback
+- Anzahl unzugeordneter Einträge
+- Top-Gruppenverteilung
+
+Auf Wunsch kannst du zusätzlich einen JSON-Report schreiben lassen:
+
+```sh
+cd backend
+./.venv/bin/python scripts/quantitative_bls_eval.py --all --seed 42 --report-out instance/quantitative_bls_report.json
+```
+
 ### Backend-Coverage anzeigen
 
 ```sh
