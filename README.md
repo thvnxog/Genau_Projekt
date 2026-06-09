@@ -257,6 +257,12 @@ Das Skript loggt im Terminal u.a.:
 - Anzahl unzugeordneter Einträge
 - Top-Gruppenverteilung
 
+Der Parameter `--seed` steuert die Zufallsauswahl bei Stichproben und bei
+der internen Reihenfolge des Testlaufs. Gleiche Seed-Zahl bedeutet also
+denselben Lauf mit denselben Beispielgerichten. Wenn du unterschiedliche
+Beispiele sehen willst, kannst du den Seed ändern, z. B. `--seed 7` oder
+`--seed 20240609`.
+
 Auf Wunsch kannst du zusätzlich einen JSON-Report schreiben lassen:
 
 ```sh
