@@ -278,7 +278,7 @@ cd backend
 Du kannst mehrere Wochen simulieren lassen, damit das Skript **pro Woche** Metriken ausgibt
 und im Report die Liste `per_week` sowie die Aggregation `per_week_summary` enthält.
 
-- Default: `--weeks 1` (eine Woche).  
+- Default: `--weeks 1` (eine Woche).
 - Beispiel: `--weeks 4` simuliert 4 Wochen und verteilt die getesteten Gerichte auf
   `4 * 5` Wochentage.
 
@@ -294,6 +294,7 @@ Woche und unter `summary.per_week_summary` die zusammenfassenden Kennzahlen
 (Durchschnittsrate, Minimum, Maximum der finalen Erkennungsraten pro Woche).
 
 Jede Woche im Report enthält zudem:
+
 - `items_recognized`: Liste der erkannten Gerichte (mit Gruppen, Confidence, ggf. BLS-ID)
 - `items_unmapped`: Liste der nicht erkannten Gerichte
 
@@ -301,7 +302,6 @@ Jede Woche im Report enthält zudem:
 
 Hinweis: Wenn du `--seed` weglässt, erzeugt jeder Aufruf eine neue zufällige
 Stichprobe; setze `--seed <zahl>` für reproduzierbare Läufe.
-
 
 ### Backend-Coverage anzeigen
 
