@@ -239,14 +239,16 @@ Wenn man messen will, wie gut die aktuelle Enrichment-Logik BLS-Gerichte erkennt
 
 ```sh
 cd backend
-./.venv/bin/python scripts/quantitative_bls_eval.py --all --seed 42
+# Standard: keine Seed-Angabe → bei jedem Aufruf neue Zufallsstichprobe
+./.venv/bin/python scripts/quantitative_bls_eval.py --all
 ```
 
 Optional kannst du nur eine Teilmenge testen:
 
 ```sh
 cd backend
-./.venv/bin/python scripts/quantitative_bls_eval.py --sample-size 200 --seed 42
+# Teilmenge testen, standardmäßig ohne festen Seed (zufällige Auswahl)
+./.venv/bin/python scripts/quantitative_bls_eval.py --sample-size 200
 ```
 
 Das Skript loggt im Terminal u.a.:
@@ -258,17 +260,48 @@ Das Skript loggt im Terminal u.a.:
 - Top-Gruppenverteilung
 
 Der Parameter `--seed` steuert die Zufallsauswahl bei Stichproben und bei
-der internen Reihenfolge des Testlaufs. Gleiche Seed-Zahl bedeutet also
-denselben Lauf mit denselben Beispielgerichten. Wenn du unterschiedliche
-Beispiele sehen willst, kannst du den Seed ändern, z. B. `--seed 7` oder
-`--seed 20240609`.
+der internen Reihenfolge des Testlaufs. Wenn du `--seed` weglässt, erzeugt
+jeder Aufruf eine neue, zufällige Stichprobe (praktisch für Exploration).
+Setze `--seed <zahl>` (z. B. `--seed 42`), wenn du einen Lauf reproduzierbar
+machen möchtest.
 
 Auf Wunsch kannst du zusätzlich einen JSON-Report schreiben lassen:
 
 ```sh
 cd backend
-./.venv/bin/python scripts/quantitative_bls_eval.py --all --seed 42 --report-out instance/quantitative_bls_report.json
+# Mit Report-Ausgabe (optional) — Seed weglassen für neue Stichprobe, oder setzen für Reproduzierbarkeit
+./.venv/bin/python scripts/quantitative_bls_eval.py --all --report-out instance/quantitative_bls_report.json
 ```
+
+#### Wochen‑Simulation (`--weeks`)
+
+Du kannst mehrere Wochen simulieren lassen, damit das Skript **pro Woche** Metriken ausgibt
+und im Report die Liste `per_week` sowie die Aggregation `per_week_summary` enthält.
+
+- Default: `--weeks 1` (eine Woche).  
+- Beispiel: `--weeks 4` simuliert 4 Wochen und verteilt die getesteten Gerichte auf
+  `4 * 5` Wochentage.
+
+Beispielaufruf mit 4 Wochen und Report‑Ausgabe:
+
+```sh
+cd backend
+./.venv/bin/python scripts/quantitative_bls_eval.py --sample-size 100 --weeks 4 --report-out instance/bls_report_4w.json
+```
+
+Im erzeugten JSON‑Report findest du dann unter `summary.per_week` die Metriken pro
+Woche und unter `summary.per_week_summary` die zusammenfassenden Kennzahlen
+(Durchschnittsrate, Minimum, Maximum der finalen Erkennungsraten pro Woche).
+
+Jede Woche im Report enthält zudem:
+- `items_recognized`: Liste der erkannten Gerichte (mit Gruppen, Confidence, ggf. BLS-ID)
+- `items_unmapped`: Liste der nicht erkannten Gerichte
+
+**Console-Ausgabe:** Bei der Ausführung werden pro Woche die Top 10 erkannten und nicht erkannten Gerichte angezeigt (in tabellarischer Form mit Gruppen und Confidence-Werten), sodass du schnell sehen kannst, wo das System gut funktioniert und wo es Probleme gibt.
+
+Hinweis: Wenn du `--seed` weglässt, erzeugt jeder Aufruf eine neue zufällige
+Stichprobe; setze `--seed <zahl>` für reproduzierbare Läufe.
+
 
 ### Backend-Coverage anzeigen
 

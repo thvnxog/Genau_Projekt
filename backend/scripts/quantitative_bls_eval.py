@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import random
 import sqlite3
 import sys
@@ -79,8 +80,12 @@ def load_bls_rows(db_path: Path) -> list[dict]:
         conn.close()
 
 
-def build_week_plan(names: Iterable[str], seed: int | None = None) -> dict:
-    """Verpackt Gerichtsnamen in einen künstlichen Wochenplan."""
+def build_week_plan(names: Iterable[str], seed: int | None = None, weeks: int = 1) -> dict:
+    """Verpackt Gerichtsnamen in einen künstlichen Wochenplan.
+
+    Wenn `weeks` > 1, werden die Gerichte über `weeks * len(WEEKDAYS)` Slots
+    verteilt, sodass mehrere Wochen simuliert werden können.
+    """
 
     items = [{"raw_text": name, "portion": {"value": 100, "unit": "g"}, "food_groups": [], "links": {}, "tags": []} for name in names]
 
@@ -88,24 +93,28 @@ def build_week_plan(names: Iterable[str], seed: int | None = None) -> dict:
     rng.shuffle(items)
 
     days: list[dict] = []
-    chunks = max(1, len(items) // len(WEEKDAYS) + (1 if len(items) % len(WEEKDAYS) else 0))
 
-    for idx, weekday in enumerate(WEEKDAYS):
-        start = idx * chunks
-        end = min(start + chunks, len(items))
-        day_items = items[start:end]
-        days.append(
-            {
-                "weekday": weekday,
-                "week_index": 0,
-                "menus": [
-                    {
-                        "menu_type": "mischkost",
-                        "items": day_items,
-                    }
-                ],
-            }
-        )
+    total_slots = max(1, weeks * len(WEEKDAYS))
+    slot_size = max(1, (len(items) + total_slots - 1) // total_slots)
+
+    for w in range(weeks):
+        for idx, weekday in enumerate(WEEKDAYS):
+            slot = w * len(WEEKDAYS) + idx
+            start = slot * slot_size
+            end = min(start + slot_size, len(items))
+            day_items = items[start:end]
+            days.append(
+                {
+                    "weekday": weekday,
+                    "week_index": w,
+                    "menus": [
+                        {
+                            "menu_type": "mischkost",
+                            "items": day_items,
+                        }
+                    ],
+                }
+            )
 
     return {"schema_version": "1.0", "days": days}
 
@@ -145,6 +154,71 @@ def summarize(enriched: dict, stats: dict, total_items: int) -> dict:
     final_recognition = int(stats.get("mapped_groups", 0))
     via_bls = int(stats.get("mapped_via_bls", 0))
     still_unmapped = int(stats.get("still_unmapped", 0))
+    # Per-week statistics: gruppiere Tage nach week_index
+    weeks: dict[int, list[dict]] = {}
+    for day in enriched.get("days", []):
+        wk = int(day.get("week_index", 0) or 0)
+        weeks.setdefault(wk, [])
+        for menu in day.get("menus", []):
+            weeks[wk].extend(menu.get("items", []))
+
+    per_week: list[dict] = []
+    final_rates: list[float] = []
+    for wk in sorted(weeks.keys()):
+        w_items = weeks[wk]
+        tot = len(w_items)
+        final_count = sum(1 for i in w_items if (i.get("food_groups") or []))
+        direct_count = sum(1 for i in w_items if (i.get("food_groups") or []) and not i.get("links", {}).get("bls_id"))
+        bls_count = sum(1 for i in w_items if i.get("links", {}).get("bls_id"))
+        still_unmapped_w = tot - final_count
+        multi_w = sum(1 for i in w_items if len(i.get("food_groups") or []) > 1)
+
+        final_rate = round(final_count / tot, 4) if tot else 0.0
+        final_rates.append(final_rate)
+
+        # Sammle Item-Details pro Woche
+        items_recognized: list[dict] = []
+        items_unmapped: list[dict] = []
+        for item in w_items:
+            raw_text = item.get("raw_text", "")
+            groups = item.get("food_groups") or []
+            if groups:
+                items_recognized.append({
+                    "name": raw_text,
+                    "groups": groups,
+                    "bls_id": item.get("links", {}).get("bls_id"),
+                    "confidence": item.get("links", {}).get("confidence"),
+                })
+            else:
+                items_unmapped.append({"name": raw_text})
+
+        per_week.append(
+            {
+                "week_index": wk,
+                "total_items": tot,
+                "direct_recognition_count": direct_count,
+                "direct_recognition_rate": round(direct_count / tot, 4) if tot else 0.0,
+                "final_recognition_count": final_count,
+                "final_recognition_rate": final_rate,
+                "bls_fallback_count": bls_count,
+                "bls_fallback_rate": round(bls_count / tot, 4) if tot else 0.0,
+                "still_unmapped_count": still_unmapped_w,
+                "still_unmapped_rate": round(still_unmapped_w / tot, 4) if tot else 0.0,
+                "multi_group_items": multi_w,
+                "multi_group_rate": round(multi_w / tot, 4) if tot else 0.0,
+                "items_recognized": items_recognized,
+                "items_unmapped": items_unmapped,
+            }
+        )
+
+    per_week_summary: dict = {}
+    if final_rates:
+        per_week_summary = {
+            "weeks_count": len(final_rates),
+            "mean_final_recognition_rate": round(sum(final_rates) / len(final_rates), 4),
+            "min_final_recognition_rate": min(final_rates),
+            "max_final_recognition_rate": max(final_rates),
+        }
 
     return {
         "total_items": total_items,
@@ -161,7 +235,10 @@ def summarize(enriched: dict, stats: dict, total_items: int) -> dict:
         "group_distribution": primary_counter.most_common(),
         "all_group_distribution": group_counter.most_common(),
         "sample_unmapped": unmapped_names[:20],
+        "per_week": per_week,
+        "per_week_summary": per_week_summary,
     }
+
 
 
 def parse_args() -> argparse.Namespace:
@@ -171,7 +248,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--mapping-json", type=Path, default=BACKEND_DIR / "rules" / "bls_to_dge_groups.json", help="Optionales JSON-Mapping")
     parser.add_argument("--all", action="store_true", help="Alle BLS-Gerichte testen (Default)")
     parser.add_argument("--sample-size", type=int, default=0, help="Zufällige Teilmenge der BLS-Gerichte (0 = alle)")
-    parser.add_argument("--seed", type=int, default=42, help="Seed für reproduzierbare Zufallsauswahl")
+    parser.add_argument("--seed", type=int, default=None, help="Optionaler Seed für reproduzierbare Zufallsauswahl (default: None = neue Zufallswahl pro Lauf)")
+    parser.add_argument("--weeks", type=int, default=1, help="Anzahl Wochen, die pro Sample simuliert werden sollen (default=1)")
     parser.add_argument("--report-out", type=Path, default=None, help="Optional: JSON-Report auf Disk schreiben")
     return parser.parse_args()
 
@@ -192,7 +270,7 @@ def main() -> int:
         rows = rng.sample(rows, args.sample_size)
 
     names = [row["name"] for row in rows]
-    plan = build_week_plan(names, seed=args.seed)
+    plan = build_week_plan(names, seed=args.seed, weeks=getattr(args, "weeks", 1))
     group_keywords, tag_keywords = build_keywords(args.keywords_root, args.mapping_json)
 
     enriched, stats = enrich_plan(plan, group_keywords, tag_keywords, args.bls_db)
@@ -211,8 +289,38 @@ def main() -> int:
     for group, count in summary["group_distribution"][:10]:
         print(f"- {group}: {count}")
 
+    # Pro-Woche Übersicht mit erkannten/nicht erkannten Gerichten
+    if summary.get("per_week"):
+        print("\n" + "=" * 80)
+        print("WOCHEN-DETAIL")
+        print("=" * 80)
+        for week_data in summary["per_week"]:
+            wk = week_data.get("week_index", 0)
+            tot = week_data.get("total_items", 0)
+            final_rate = week_data.get("final_recognition_rate", 0.0)
+            recognized = week_data.get("items_recognized", [])
+            unmapped = week_data.get("items_unmapped", [])
+
+            print(f"\n### Woche {wk + 1} (insgesamt {tot} Gerichte, erkannt {final_rate:.1%})")
+            
+            if recognized:
+                print(f"  ✓ Erkannt ({len(recognized)}):")
+                for item in recognized[:10]:  # max. 10 pro Konsole
+                    groups_str = ", ".join(item.get("groups", []))
+                    conf = item.get("confidence", 0)
+                    print(f"    • {item['name'][:50]:50s} → {groups_str:20s} (conf: {conf:.2f})")
+                if len(recognized) > 10:
+                    print(f"    ... und {len(recognized) - 10} weitere")
+            
+            if unmapped:
+                print(f"  ✗ Nicht erkannt ({len(unmapped)}):")
+                for item in unmapped[:10]:  # max. 10 pro Konsole
+                    print(f"    • {item['name'][:60]}")
+                if len(unmapped) > 10:
+                    print(f"    ... und {len(unmapped) - 10} weitere")
+
     if summary["sample_unmapped"]:
-        print("\nBeispiel für unzugeordnete Gerichte:")
+        print("\nBeispiel für unzugeordnete Gerichte (gesamt):")
         for name in summary["sample_unmapped"][:10]:
             print(f"- {name}")
 
@@ -225,6 +333,7 @@ def main() -> int:
                     "stats": stats,
                     "seed": args.seed,
                     "sample_size": args.sample_size,
+                    "weeks": getattr(args, "weeks", 1),
                 },
                 indent=2,
                 ensure_ascii=False,
