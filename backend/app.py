@@ -255,24 +255,16 @@ def create_app():
             )
 
         from scripts.enrich_foodplan import (
-            load_keyword_files,
             load_json_mapping,
-            merge_keywords,
             enrich_plan,
         )
 
         base_dir = Path(__file__).resolve().parent  # backend/
-        keywords_root = base_dir / "rules" / "keywords"
         mapping_json = base_dir / "rules" / "bls_to_dge_groups.json"
 
-        logger.debug("Loading enrichment keywords from %s", keywords_root)
+        logger.debug("Loading enrichment mapping from %s", mapping_json)
 
-        group_txt = load_keyword_files(keywords_root / "groups")
-        tag_txt = load_keyword_files(keywords_root / "tags")
-        group_json, tag_json = load_json_mapping(mapping_json)
-
-        group_keywords = merge_keywords(group_txt, group_json)
-        tag_keywords = merge_keywords(tag_txt, tag_json)
+        group_keywords, tag_keywords = load_json_mapping(mapping_json)
 
         bls_db_path = resolve_bls_db_path(base_dir)
         plan, stats = enrich_plan(

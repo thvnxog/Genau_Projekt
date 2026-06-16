@@ -248,47 +248,11 @@ def keyword_matches_text(raw_text: str, tokens: List[str], kw: str) -> bool:
 
 
 # -----------------------------
-# Keyword-Lader
-# -----------------------------
-
-def load_keyword_files(folder: Path) -> Dict[str, List[str]]:
-    """Lädt Keyword-Listen aus einem Ordner (`*.txt`).
-
-    Konvention:
-    - Dateiname ohne Endung wird zum Key
-      z.B. `vegetables.txt` -> key "vegetables"
-
-    Dateiinhalt:
-    - je Zeile ein Keyword
-    - leere Zeilen und Kommentare (#...) werden ignoriert
-    """
-
-    data: Dict[str, List[str]] = {}
-    if not folder.exists():
-        return data
-
-    for p in sorted(folder.glob("*.txt")):
-        key = p.stem
-        lines: List[str] = []
-        for line in p.read_text(encoding="utf-8").splitlines():
-            line = normalize_text(line)
-            if not line or line.startswith("#"):
-                continue
-            lines.append(line)
-
-        # Duplikate entfernen und stabil sortieren
-        data[key] = sorted(set(lines))
-
-    return data
-
-
-# -----------------------------
-# Optional: JSON-Mapping zusätzlich laden
-# (wir "mergen" Keywords aus JSON + .txt)
+# Keyword-Lader (JSON-Mapping)
 # -----------------------------
 
 def load_json_mapping(path: Path) -> Tuple[Dict[str, List[str]], Dict[str, List[str]]]:
-    """Lädt optional Keyword-Listen aus einem JSON-Mapping.
+    """Lädt Keyword-Listen aus einem JSON-Mapping.
 
     Erwartete Struktur:
       {
@@ -299,8 +263,6 @@ def load_json_mapping(path: Path) -> Tuple[Dict[str, List[str]], Dict[str, List[
     Rückgabe:
       group_keywords[group] = [...]
       tag_keywords[tag]     = [...]
-
-    Das wird später mit den .txt Keywords zusammengeführt (merge_keywords).
     """
 
     if not path.exists():
@@ -330,19 +292,7 @@ def load_json_mapping(path: Path) -> Tuple[Dict[str, List[str]], Dict[str, List[
     return group_kw, tag_kw
 
 
-def merge_keywords(a: Dict[str, List[str]], b: Dict[str, List[str]]) -> Dict[str, List[str]]:
-    """Merged zwei Keyword-Dicts (key->list) und dedupliziert."""
-
-    out: Dict[str, List[str]] = {}
-    keys = set(a.keys()) | set(b.keys())
-    for k in keys:
-        out[k] = sorted(set((a.get(k, []) or []) + (b.get(k, []) or [])))
-    return out
-
-
-# -----------------------------
-# Matching: Best Group + Tags
-# -----------------------------
+# --------------------
 
 @dataclass
 class MatchResult:
@@ -703,14 +653,8 @@ def main():
     ap.add_argument(
         "--mapping-json",
         dest="mapping_json",
-        required=False,
-        help="Optional: bls_to_dge_groups.json (wird mit .txt Keywords gemerged)",
-    )
-    ap.add_argument(
-        "--keywords-root",
-        dest="kwroot",
-        default="rules/keywords",
-        help="Ordner mit keywords/groups und keywords/tags (default: rules/keywords)",
+        required=True,
+        help="bls_to_dge_groups.json für Keywords und Tags",
     )
     ap.add_argument(
         "--bls-db",
@@ -722,25 +666,14 @@ def main():
 
     inp = Path(args.inp)
     out = Path(args.out)
-    kwroot = Path(args.kwroot)
 
     # Input-Plan laden
     plan = json.loads(inp.read_text(encoding="utf-8"))
 
-    # 1) Keywords aus TXT
-    group_txt = load_keyword_files(kwroot / "groups")
-    tag_txt = load_keyword_files(kwroot / "tags")
+    # Keywords aus JSON laden
+    group_keywords, tag_keywords = load_json_mapping(Path(args.mapping_json))
 
-    # 2) optional Keywords aus JSON (werden gemerged)
-    group_json: Dict[str, List[str]] = {}
-    tag_json: Dict[str, List[str]] = {}
-    if args.mapping_json:
-        group_json, tag_json = load_json_mapping(Path(args.mapping_json))
-
-    group_keywords = merge_keywords(group_txt, group_json)
-    tag_keywords = merge_keywords(tag_txt, tag_json)
-
-    # 3) enrichment durchführen
+    # enrichment durchführen
     bls_db_path = Path(args.blsdb) if args.blsdb else None
     enriched, stats = enrich_plan(plan, group_keywords, tag_keywords, bls_db_path)
 

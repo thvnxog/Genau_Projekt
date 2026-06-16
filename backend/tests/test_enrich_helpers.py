@@ -4,8 +4,6 @@ from scripts.enrich_foodplan import (
     collect_tags,
     collect_note_tags,
     load_json_mapping,
-    load_keyword_files,
-    merge_keywords,
     pick_best_group,
     pick_matching_groups,
     tokenize,
@@ -36,48 +34,31 @@ def test_pick_best_group_and_matching_groups():
     assert {match.key for match in matches} == {"fish", "vegetables"}
 
 
-def test_collect_tags_and_keyword_loading(tmp_path):
-  # Keywords werden aus Dateien und JSON geladen und anschließend zu Tags zusammengeführt.
-    keywords_root = tmp_path / "keywords"
-    groups_dir = keywords_root / "groups"
-    tags_dir = keywords_root / "tags"
-    groups_dir.mkdir(parents=True)
-    tags_dir.mkdir(parents=True)
-
-    (groups_dir / "vegetables.txt").write_text("# comment\nGemüse\nGemüse\n", encoding="utf-8")
-    (tags_dir / "wholegrain.txt").write_text("Vollkorn\n", encoding="utf-8")
-
+def test_collect_tags_and_json_mapping(tmp_path):
+  # Keywords werden aus JSON geladen und zu Tags zusammengeführt.
     json_path = tmp_path / "mapping.json"
     json_path.write_text(
         """
         {
           "mapping": [
-            {"dge_food_group": "fish", "match": {"contains_any": ["fisch"]}}
+            {"dge_food_group": "fish", "match": {"contains_any": ["fisch"]}},
+            {"dge_food_group": "vegetables", "match": {"contains_any": ["gemüse"]}}
           ],
           "tags": [
-            {"tag": "raw_veg", "match": {"contains_any": ["rohkost"]}}
+            {"tag": "raw_veg", "match": {"contains_any": ["rohkost"]}},
+            {"tag": "wholegrain", "match": {"contains_any": ["vollkorn"]}}
           ]
         }
         """,
         encoding="utf-8",
     )
 
-    group_txt = load_keyword_files(groups_dir)
-    tag_txt = load_keyword_files(tags_dir)
     group_json, tag_json = load_json_mapping(json_path)
 
-    assert group_txt == {"vegetables": ["gemüse"]}
-    assert tag_txt == {"wholegrain": ["vollkorn"]}
-    assert group_json == {"fish": ["fisch"]}
-    assert tag_json == {"raw_veg": ["rohkost"]}
+    assert group_json == {"fish": ["fisch"], "vegetables": ["gemüse"]}
+    assert tag_json == {"raw_veg": ["rohkost"], "wholegrain": ["vollkorn"]}
 
-    merged_groups = merge_keywords(group_txt, group_json)
-    merged_tags = merge_keywords(tag_txt, tag_json)
-
-    assert merged_groups == {"fish": ["fisch"], "vegetables": ["gemüse"]}
-    assert merged_tags == {"raw_veg": ["rohkost"], "wholegrain": ["vollkorn"]}
-
-    assert collect_tags("Vollkorn und Rohkost", merged_tags) == ["raw_veg", "wholegrain"]
+    assert collect_tags("Vollkorn und Rohkost", tag_json) == ["raw_veg", "wholegrain"]
 
 
 def test_collect_note_tags_maps_excel_additions_to_tags():

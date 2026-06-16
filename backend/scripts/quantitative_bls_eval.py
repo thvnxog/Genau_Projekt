@@ -34,8 +34,6 @@ from scripts.enrich_foodplan import (  # noqa: E402
     detect_table_and_columns,
     enrich_plan,
     load_json_mapping,
-    load_keyword_files,
-    merge_keywords,
 )
 
 
@@ -120,15 +118,12 @@ def build_week_plan(names: Iterable[str], seed: int | None = None, weeks: int = 
 
 
 def build_keywords(root: Path, mapping_json: Path | None) -> tuple[dict, dict]:
-    group_txt = load_keyword_files(root / "groups")
-    tag_txt = load_keyword_files(root / "tags")
-
     group_json: dict = {}
     tag_json: dict = {}
     if mapping_json and mapping_json.exists():
         group_json, tag_json = load_json_mapping(mapping_json)
 
-    return merge_keywords(group_txt, group_json), merge_keywords(tag_txt, tag_json)
+    return group_json, tag_json
 
 
 def summarize(enriched: dict, stats: dict, total_items: int) -> dict:
@@ -244,7 +239,6 @@ def summarize(enriched: dict, stats: dict, total_items: int) -> dict:
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Quantitativer BLS-Test für das Foodplan-Enrichment")
     parser.add_argument("--bls-db", type=Path, default=default_bls_db_path(), help="Pfad zur SQLite-BLS-Datenbank")
-    parser.add_argument("--keywords-root", type=Path, default=BACKEND_DIR / "rules" / "keywords", help="Keyword-Ordner mit groups/ und tags/")
     parser.add_argument("--mapping-json", type=Path, default=BACKEND_DIR / "rules" / "bls_to_dge_groups.json", help="Optionales JSON-Mapping")
     parser.add_argument("--all", action="store_true", help="Alle BLS-Gerichte testen (Default)")
     parser.add_argument("--sample-size", type=int, default=0, help="Zufällige Teilmenge der BLS-Gerichte (0 = alle)")
@@ -271,7 +265,7 @@ def main() -> int:
 
     names = [row["name"] for row in rows]
     plan = build_week_plan(names, seed=args.seed, weeks=getattr(args, "weeks", 1))
-    group_keywords, tag_keywords = build_keywords(args.keywords_root, args.mapping_json)
+    group_keywords, tag_keywords = build_keywords(None, args.mapping_json)
 
     enriched, stats = enrich_plan(plan, group_keywords, tag_keywords, args.bls_db)
     summary = summarize(enriched, stats, len(names))

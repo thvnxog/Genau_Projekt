@@ -408,13 +408,10 @@ npm run dev
 - `backend/scripts/`: Hilfsskripte für Verarbeitung/Evaluation (siehe unten)
   - `backend/scripts/enrich_foodplan.py`: reichert `foodplan.json` mit `links.food_group`, `tags` und Confidence an (Output: `foodplan.enriched.json`)
   - `backend/scripts/evaluate_foodplan.py`: bewertet einen (enriched) Plan gegen `rules/dge_lunch_rules.json` und erzeugt einen Dual-Report (`report.dual.json`)
-- `backend/rules/`: Regel- und Mapping-Dateien (JSON) + Keyword-Listen
+- `backend/rules/`: Regel- und Mapping-Dateien (JSON)
   - `backend/rules/dge_lunch_rules.json`: Regeln für die DGE-Lunch-Auswertung
   - `backend/rules/DGE_GRAMM_TODO.md`: Arbeitsstand + TODO-Liste fuer die geplante Gramm-Regelumsetzung
   - `backend/rules/bls_to_dge_groups.json`: Mapping/Keywords zur Zuordnung BLS/Begriffe -> DGE-Food-Groups
-  - `backend/rules/keywords/`: Keyword-Dateien als `.txt`
-    - `backend/rules/keywords/groups/`: Keywords je Food-Group (z.B. `vegetable.txt`, `meat.txt`)
-    - `backend/rules/keywords/tags/`: Keywords je Tag (optional)
 - `backend/instance/bls.db`: SQLite Datenbankdatei (wird beim Import erzeugt)
 - `backend/instance/uploads/`: optionaler Ordner (derzeit nicht genutzt) – Uploads werden in-memory verarbeitet und nicht auf Disk gespeichert
 
