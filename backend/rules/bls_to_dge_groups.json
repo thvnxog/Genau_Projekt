@@ -29,7 +29,8 @@
           "tomate",
           "paprika",
           "romanesco",
-          "spinat"
+          "spinat",
+          "vegetarisch"
         ]
       }
     },
@@ -110,7 +111,7 @@
           "vollkorn",
           "haferflocken",
           "dinkelvollkorn",
-          "saatenbrot"
+          "brot"
         ]
       }
     },

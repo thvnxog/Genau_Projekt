@@ -15,12 +15,14 @@ source .venv/bin/activate
 pip install -r backend/requirements.txt
 ```
 
-2. DB erstellen + BLS importieren
+2. DB erstellen + BLS importieren (Pflicht)
 
 ```sh
 rm -f backend/instance/bls.db
 python backend/import_bls.py
 ```
+
+Die BLS-Datenbank ist für den Excel-Import zwingend erforderlich. Ohne `backend/instance/bls.db` startet das Backend zwar, der Upload von `.xlsx`-Plänen schlägt jedoch fehl.
 
 3. Alle Services starten (Backend + Frontend)
 
@@ -70,6 +72,8 @@ pip install -r backend/requirements.txt
 ## 3) Datenbank neu erstellen + Import aus Excel
 
 Die SQLite-DB liegt (typisch) unter `backend/instance/bls.db`.
+
+Die BLS-Datenbank ist für den Excel-Import verpflichtend. Wenn die Datei fehlt, wird der Upload von `.xlsx`-Speiseplänen mit einer Fehlermeldung abgewiesen.
 
 ### Komplett neu (frische DB-Datei)
 

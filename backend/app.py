@@ -267,6 +267,19 @@ def create_app():
         group_keywords, tag_keywords = load_json_mapping(mapping_json)
 
         bls_db_path = resolve_bls_db_path(base_dir)
+        if bls_db_path is None or not bls_db_path.exists():
+            logger.error(
+                "BLS-DB nicht gefunden: %s. Bitte importieren Sie die Datenbank mit backend/import_bls.py.",
+                bls_db_path or "backend/instance/bls.db",
+            )
+            abort(
+                500,
+                description=(
+                    "BLS-Datenbank nicht gefunden. Bitte importieren Sie die BLS-Datenbank "
+                    "mit backend/import_bls.py und starten Sie den Upload erneut."
+                ),
+            )
+
         plan, stats = enrich_plan(
             plan,
             group_keywords,
