@@ -84,6 +84,25 @@ def test_enrich_plan_uses_bls_fallback_when_keywords_do_not_match(tmp_path):
     assert item["links"]["bls_name"] == "Gemüsepfanne"
 
 
+def test_enrich_plan_rejects_false_positive_meat_tags_for_vegetarian_dishes():
+    # Negativfall: Ein vegetarisches Schnitzel sollte nicht als Fleischgericht gezählt werden.
+    plan = build_plan("Vegetarisches Schnitzel")
+
+    group_keywords = {
+        "meat": ["fleisch", "hähnchen", "rind", "schwein"],
+        "vegetables": ["gemüse"],
+    }
+    tag_keywords = {}
+
+    enriched, stats = enrich_plan(plan, group_keywords, tag_keywords)
+    item = enriched["days"][0]["menus"][0]["items"][0]
+
+    assert item["food_groups"] == []
+    assert item["links"]["food_group"] is None
+    assert item["links"]["confidence"] == 0.0
+    assert stats["mapped_groups"] == 0
+
+
 def test_bls_fallback_prefers_name_de_column(tmp_path):
     # Die reale BLS-DB nutzt name_de als Spalte für Lebensmittelbezeichnungen.
     db_path = tmp_path / "bls.db"
