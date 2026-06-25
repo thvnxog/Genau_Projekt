@@ -26,6 +26,8 @@ from scripts.enrich_foodplan import (
     compound_token_variants,
     find_bls_matches_for_text,
     load_code_letter_mapping,
+    rank_phrase_groups,
+    phrase_is_too_ambiguous,
     enrich_plan,
 )
 
@@ -195,17 +197,22 @@ def debug_enrichment(
         
         logger.pop()
         
-        # Beste Gruppe für diese Phrase
-        if phrase_group_scores:
-            max_score = max(phrase_group_scores.values())
-            phrase_best_groups = [g for g, s in phrase_group_scores.items() if s == max_score]
-            sorted_groups = sorted(
-                phrase_best_groups,
-                key=lambda g: phrase_group_first_seen.get(g, float('inf')),
+        # Beste Gruppe für diese Phrase, aber nur wenn nicht zu breit
+        phrase_best_groups, max_score, total_score = rank_phrase_groups(
+            phrase_group_scores,
+            phrase_group_first_seen,
+        )
+        if phrase_group_scores and phrase_is_too_ambiguous(
+            len(phrase_group_scores), max_score, total_score
+        ):
+            logger.log(
+                f"\n⚠ Phrase zu mehrdeutig: {len(phrase_group_scores)} Gruppen, "
+                f"Top-Score {max_score}/{total_score}",
+                "WARNING",
             )
-            
-            logger.log(f"\n✓ Phrase-Ergebnis: {sorted_groups} (max score: {max_score})", "SUCCESS")
-            for group in sorted_groups:
+        elif phrase_group_scores:
+            logger.log(f"\n✓ Phrase-Ergebnis: {phrase_best_groups} (max score: {max_score})", "SUCCESS")
+            for group in phrase_best_groups:
                 if group not in all_groups:
                     all_groups.append(group)
         else:

@@ -17,6 +17,7 @@ import json
 import re
 import sqlite3
 import unicodedata
+from functools import lru_cache
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
@@ -82,13 +83,34 @@ def tokenize(s: str) -> List[str]:
     return tokens
 
 
-def compound_token_variants(token: str) -> List[str]:
+def _candidate_forms(token: str) -> List[str]:
+    """Erzeugt wenige einfache Normalformen für einen Kandidaten."""
+
+    forms = [token]
+    for suffix in ("en", "er", "es", "e", "n", "s"):
+        if len(token) > len(suffix) + 3 and token.endswith(suffix):
+            forms.append(token[: -len(suffix)])
+    unique_forms: List[str] = []
+    seen: set[str] = set()
+    for form in forms:
+        if form in seen:
+            continue
+        seen.add(form)
+        unique_forms.append(form)
+    return unique_forms
+
+
+def compound_token_variants(
+    token: str, known_terms: Optional[set[str]] = None
+) -> List[str]:
     """Erzeugt Fallback-Varianten für zusammengesetzte Tokens.
 
     Direkte Treffer bleiben Vorrang. Wenn ein Token wie `saatenbrot` keinen
-    Direkttreffer liefert, helfen Teilstücke wie `saaten` und `brot` weiter.
-    
-    Nur für längere Tokens (10+ Zeichen) werden Varianten generiert.
+    Direkttreffer liefert, helfen nur noch Teilstücke weiter, die auch wirklich
+    als bekannte BLS-Wörter vorkommen.
+
+    Ohne `known_terms` wird kein wildes Zerschneiden gemacht, sondern nur das
+    Originaltoken zurückgegeben.
     """
 
     token = normalize_text(token)
@@ -96,16 +118,33 @@ def compound_token_variants(token: str) -> List[str]:
         return []
 
     variants = [token]
-    if len(token) < 10:
+    if len(token) < 10 or not known_terms:
         return variants
+
+    known_terms_norm = {normalize_text(term) for term in known_terms if term}
+
+    best_suffix: Optional[str] = None
+    best_prefix: Optional[str] = None
 
     for split_pos in range(4, len(token) - 3):
         prefix = token[:split_pos]
         suffix = token[split_pos:]
-        if len(prefix) >= 4:
-            variants.append(prefix)
-        if len(suffix) >= 4:
-            variants.append(suffix)
+
+        for candidate in _candidate_forms(suffix):
+            if len(candidate) >= 4 and candidate in known_terms_norm:
+                if best_suffix is None or len(candidate) > len(best_suffix):
+                    best_suffix = candidate
+
+        if best_suffix is None:
+            for candidate in _candidate_forms(prefix):
+                if len(candidate) >= 4 and candidate in known_terms_norm:
+                    if best_prefix is None or len(candidate) > len(best_prefix):
+                        best_prefix = candidate
+
+    if best_suffix and best_suffix not in variants:
+        variants.append(best_suffix)
+    elif best_prefix and best_prefix not in variants:
+        variants.append(best_prefix)
 
     unique_variants: List[str] = []
     seen: set[str] = set()
@@ -115,6 +154,32 @@ def compound_token_variants(token: str) -> List[str]:
         seen.add(variant)
         unique_variants.append(variant)
     return unique_variants
+
+
+def _db_path_for_connection(conn: sqlite3.Connection) -> Optional[str]:
+    row = conn.execute("PRAGMA database_list").fetchone()
+    if not row:
+        return None
+    path = str(row[2] or "").strip()
+    return path or None
+
+
+@lru_cache(maxsize=8)
+def _load_known_terms_from_db_path(db_path: str, table_name: str, name_col: str) -> frozenset[str]:
+    conn = sqlite3.connect(db_path)
+    try:
+        cur = conn.cursor()
+        rows = cur.execute(
+            f"SELECT DISTINCT {name_col} FROM {table_name} WHERE {name_col} IS NOT NULL"
+        ).fetchall()
+    finally:
+        conn.close()
+
+    known_terms: set[str] = set()
+    for row in rows:
+        for token in tokenize(str(row[0])):
+            known_terms.add(token)
+    return frozenset(known_terms)
 
 
 def token_matches_keyword(token: str, kw: str) -> bool:
@@ -222,13 +287,18 @@ def find_bls_matches_for_text(
         if not t or not name_col:
             continue
 
+        db_path = _db_path_for_connection(conn)
+        known_terms = (
+            set(_load_known_terms_from_db_path(db_path, t, name_col)) if db_path else None
+        )
+
         tokens = tokenize(phrase)
         if not tokens:
             continue
 
         cur = conn.cursor()
         for token in tokens:
-            search_variants = compound_token_variants(token)
+            search_variants = compound_token_variants(token, known_terms)
 
             for search_token in search_variants:
                 where_sql = f"LOWER({name_col}) LIKE ?"
@@ -267,6 +337,48 @@ def find_bls_matches_for_text(
         matches.append((code, name, rid, int(score)))
 
     return matches
+
+
+PHRASE_MAX_CANDIDATE_GROUPS = 3
+PHRASE_MIN_DOMINANCE = 0.5
+
+
+def rank_phrase_groups(
+    phrase_group_scores: Dict[str, int],
+    phrase_group_first_seen: Dict[str, int],
+) -> Tuple[List[str], int, int]:
+    """Bestimmt die bestbewerteten Gruppen einer Phrase.
+
+    Rückgabe:
+    - best_groups: Gruppen mit dem höchsten Score, stabil nach Erstauftreten sortiert
+    - max_score: höchster Gruppen-Score
+    - total_score: Summe aller Gruppen-Score
+    """
+
+    if not phrase_group_scores:
+        return [], 0, 0
+
+    max_score = max(phrase_group_scores.values())
+    total_score = sum(phrase_group_scores.values())
+    best_groups = sorted(
+        [g for g, score in phrase_group_scores.items() if score == max_score],
+        key=lambda g: phrase_group_first_seen.get(g, float("inf")),
+    )
+    return best_groups, max_score, total_score
+
+
+def phrase_is_too_ambiguous(group_count: int, max_score: int, total_score: int) -> bool:
+    """Prüft, ob eine Phrase zu viele plausible Gruppen hat.
+
+    Wenn mehr als `PHRASE_MAX_CANDIDATE_GROUPS` Gruppen gleichzeitig auftreten
+    oder die führende Gruppe nicht klar dominiert, wird die Phrase nicht zugeordnet.
+    """
+
+    if group_count > PHRASE_MAX_CANDIDATE_GROUPS:
+        return True
+    if total_score and (max_score / total_score) < PHRASE_MIN_DOMINANCE:
+        return True
+    return False
 
 ADDITIONAL_NOTE_TAG_PATTERNS = {
     "bio": [r"\bbio\b"],
@@ -488,17 +600,19 @@ def enrich_plan(
                                 if group not in phrase_group_first_seen:
                                     phrase_group_first_seen[group] = len(phrase_group_first_seen)
                         
-                        # Pro Phrase: nimm die beste Gruppe
-                        if phrase_group_scores:
-                            max_score = max(phrase_group_scores.values())
-                            phrase_best_groups = sorted(
-                                [g for g, s in phrase_group_scores.items() if s == max_score],
-                                key=lambda g: phrase_group_first_seen.get(g, float('inf')),
-                            )
-                            # Füge nur die beste Gruppe der Phrase hinzu (keine Duplikate)
-                            for group in phrase_best_groups:
-                                if group not in all_phrases_groups:
-                                    all_phrases_groups.append(group)
+                        # Pro Phrase: nur zuordnen, wenn die Gruppe klar genug ist
+                        phrase_best_groups, max_score, total_score = rank_phrase_groups(
+                            phrase_group_scores,
+                            phrase_group_first_seen,
+                        )
+                        if phrase_group_scores and phrase_is_too_ambiguous(
+                            len(phrase_group_scores), max_score, total_score
+                        ):
+                            continue
+
+                        for group in phrase_best_groups:
+                            if group not in all_phrases_groups:
+                                all_phrases_groups.append(group)
 
                 groups = all_phrases_groups
                 links = item.get("links") or {}

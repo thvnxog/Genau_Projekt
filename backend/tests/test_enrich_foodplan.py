@@ -1,6 +1,12 @@
 import sqlite3
 
-from scripts.enrich_foodplan import collect_note_tags, detect_table_and_columns, enrich_plan, load_code_letter_mapping
+from scripts.enrich_foodplan import (
+    collect_note_tags,
+    compound_token_variants,
+    detect_table_and_columns,
+    enrich_plan,
+    load_code_letter_mapping,
+)
 
 
 def build_plan(raw_text: str, portion_value: float = 100.0) -> dict:
@@ -250,6 +256,52 @@ def test_enrich_plan_ignores_other_group(tmp_path):
     assert item["food_groups"] == []
     assert item["links"]["food_group"] is None
     assert item["links"]["confidence"] == 0.0
+
+
+def test_compound_token_variants_only_keep_known_terms():
+    variants = compound_token_variants(
+        "salzkartoffeln",
+        {"salz", "kartoffeln", "kartoffel", "brot"},
+    )
+
+    assert variants == ["salzkartoffeln", "kartoffeln"]
+
+
+def test_enrich_plan_leaves_ambiguous_phrase_unmapped(tmp_path):
+    db_path = tmp_path / "bls.db"
+    conn = sqlite3.connect(db_path)
+    conn.execute("CREATE TABLE foods (id INTEGER PRIMARY KEY, name_de TEXT, code TEXT)")
+    conn.executemany(
+        "INSERT INTO foods (id, name_de, code) VALUES (?, ?, ?)",
+        [
+            (1, "Tomatensauce Fisch", "A111000"),
+            (2, "Tomatensauce Gemüse", "G222000"),
+            (3, "Mozzarella Milch", "M333000"),
+            (4, "Überbacken Brot", "C444000"),
+            (5, "Überbacken Hähnchen", "U555000"),
+        ],
+    )
+    conn.commit()
+    conn.close()
+
+    mapping_path = tmp_path / "mapping.json"
+    mapping_path.write_text(
+        '{"code_letter_mapping": {"A": ["fish"], "G": ["vegetables"], "M": ["dairy"], "C": ["grains_potatoes"], "U": ["meat"]}}',
+        encoding="utf-8",
+    )
+
+    plan = build_plan("Tomatensauce & Mozzarella überbacken")
+    code_letter_map = load_code_letter_mapping(mapping_path)
+    enriched, stats = enrich_plan(plan, bls_db_path=db_path, code_letter_map=code_letter_map)
+
+    item = enriched["days"][0]["menus"][0]["items"][0]
+
+    assert stats["mapped_groups"] == 0
+    assert stats["still_unmapped"] == 1
+    assert item["food_groups"] == []
+    assert item["links"]["food_group"] is None
+    assert item["links"]["confidence"] == 0.0
+    assert item["links"]["group_scores"]
 
 
 def test_collect_note_tags_maps_excel_additions_to_tags():
