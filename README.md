@@ -1,6 +1,8 @@
 # Genau_Projekt (BLS Food API)
 
-Kleines **Flask + SQLite** Backend, das Daten aus der BLS-Excel importiert und über eine JSON-API durchsuchbar macht.
+Kleines **Flask + SQLite** Backend mit Next.js-Frontend, das BLS-Daten importiert und Speisepläne über eine JSON-API enrich't.
+
+Die aktuelle Enrichment-Logik arbeitet **BLS-first**: Es wird gegen die BLS-Datenbank gematcht und das BLS-Code-Präfix über `backend/rules/bls_to_dge_groups.json` auf DGE-Gruppen abgebildet.
 
 ## Quickstart (End-to-End testen)
 
@@ -13,6 +15,9 @@ cd <pfad-zum-projekt>/Genau_Projekt
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r backend/requirements.txt
+cd frontend
+npm install
+cd ..
 ```
 
 2. DB erstellen + BLS importieren (Pflicht)
@@ -22,7 +27,9 @@ rm -f backend/instance/bls.db
 python backend/import_bls.py
 ```
 
-Die BLS-Datenbank ist für den Excel-Import zwingend erforderlich. Ohne `backend/instance/bls.db` startet das Backend zwar, der Upload von `.xlsx`-Plänen schlägt jedoch fehl.
+Die BLS-Datenbank ist für den Excel-Upload zwingend erforderlich. Ohne `backend/instance/bls.db` startet das Backend zwar, der Upload von `.xlsx`-Plänen schlägt jedoch fehl.
+
+Der Import speichert zusätzlich den BLS-Code in der Spalte `Food.code`, damit das Enrichment später nur über den BLS-Code arbeiten kann.
 
 3. Alle Services starten (Backend + Frontend)
 
@@ -67,13 +74,20 @@ Pakete installieren:
 pip install -r backend/requirements.txt
 ```
 
-> Hinweis: Falls bei euch statt `requirements.txt` nur `requierements.txt` existiert, benennt die Datei um oder installiert entsprechend aus dieser Datei.
+Danach das Frontend einmalig installieren:
+
+```sh
+cd frontend
+npm install
+```
 
 ## 3) Datenbank neu erstellen + Import aus Excel
 
 Die SQLite-DB liegt (typisch) unter `backend/instance/bls.db`.
 
-Die BLS-Datenbank ist für den Excel-Import verpflichtend. Wenn die Datei fehlt, wird der Upload von `.xlsx`-Speiseplänen mit einer Fehlermeldung abgewiesen.
+Die BLS-Datenbank ist für den Excel-Import und das Enrichment verpflichtend. Wenn die Datei fehlt, wird der Upload von `.xlsx`-Speiseplänen mit einer Fehlermeldung abgewiesen.
+
+Das Mapping selbst liegt in `backend/rules/bls_to_dge_groups.json` und basiert auf dem ersten Buchstaben des BLS-Codes.
 
 ### Komplett neu (frische DB-Datei)
 
@@ -107,6 +121,14 @@ Alternativ über Umgebungsvariable:
 ```sh
 export BLS_XLSX_PATH="/pfad/zur/BLS_4_0_Daten_2025_DE.xlsx"
 python backend/import_bls.py
+```
+
+### BLS-DB-Pfad anpassen (optional)
+
+Wenn die SQLite-Datei nicht unter `backend/instance/bls.db` liegt, kannst du sie für den Upload und das Enrichment setzen:
+
+```sh
+export BLS_DB_PATH="/pfad/zur/bls.db"
 ```
 
 ## 4) Server starten
@@ -185,11 +207,11 @@ Minimal-Schritte:
 2. Variable setzen (Beispiel, Backend läuft lokal auf Port 5000):
 
 ```env
-# URL zum Flask Backend (für API-Calls aus dem Frontend)
+# URL zum Flask-Backend (für API-Calls aus dem Frontend)
 BACKEND_URL=http://127.0.0.1:5000
 ```
 
-> Hinweis: Variablen mit Prefix `NEXT_PUBLIC_` sind im Browser verfügbar. Nach Änderungen an `.env.local` den Dev-Server neu starten.
+> Hinweis: `BACKEND_URL` wird in den Next.js-API-Routen gelesen. Nach Änderungen an `.env.local` den Dev-Server neu starten.
 
 Dann:
 
@@ -233,7 +255,8 @@ pip install pytest
 
 Aktuell enthalten die Tests u.a. Prüfungen für:
 
-- Erkennung von Zubereitungsfragmenten (`ueberbacken`, `frittiert`, ...)
+- BLS-Code-Matching und Gruppen-Ableitung
+- mehrteilige Gerichte wie `Hähnchen mit Reis`
 - korrektes Zusammenführen von Fortsetzungszeilen
 - Monatsbeispiel-Datei mit 4 Wochen / 20 Tagen
 
