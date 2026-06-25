@@ -211,6 +211,21 @@ def token_matches_keyword(token: str, kw: str) -> bool:
     return False
 
 
+def token_exactly_matches_keyword(token: str, kw: str) -> bool:
+    """Prüft, ob Token und Keyword exakt zusammenpassen.
+
+    Dabei werden auch einfache Umlaut-Varianten über die fold-Form berücksichtigt.
+    """
+
+    if not token or not kw:
+        return False
+
+    token_variants = {token, fold_umlauts(token)}
+    kw_variants = {kw, fold_umlauts(kw)}
+
+    return any(tok == key for tok in token_variants for key in kw_variants)
+
+
 def load_code_letter_mapping(path: Path) -> Dict[str, List[str]]:
     """Lädt das Mapping von BLS-Code-Buchstaben zu DGE-Gruppen."""
 
@@ -239,7 +254,7 @@ def split_candidate_phrases(raw_text: str) -> List[str]:
         return []
 
     text = normalize_text(raw_text)
-    parts = re.split(r"\s*(?:/|\+|,|;|:|\bund\b|\bmit\b|\boder\b|\bsowie\b|\bbzw\.?\b)\s*", text)
+    parts = re.split(r"\s*(?:/|\+|,|;|:|&|\bund\b|\bmit\b|\boder\b|\bsowie\b|\bbzw\.?\b)\s*", text)
 
     cleaned: List[str] = []
     for part in parts:
@@ -299,6 +314,8 @@ def find_bls_matches_for_text(
         cur = conn.cursor()
         for token in tokens:
             search_variants = compound_token_variants(token, known_terms)
+            exact_first_matches: List[Tuple[Optional[str], Optional[str], Optional[str], int]] = []
+            fallback_matches: List[Tuple[Optional[str], Optional[str], Optional[str], int]] = []
 
             for search_token in search_variants:
                 where_sql = f"LOWER({name_col}) LIKE ?"
@@ -325,11 +342,27 @@ def find_bls_matches_for_text(
                     if score <= 0:
                         continue
 
+                    name_tokens = tokenize(normalize_text(name))
+                    is_exact_first_token = bool(name_tokens) and token_exactly_matches_keyword(
+                        name_tokens[0], search_token
+                    )
+                    if is_exact_first_token:
+                        score += EXACT_MATCH_BONUS
+
                     match_key = (code, name, rid)
-                    if match_key not in matches_by_key:
-                        matches_by_key[match_key] = [code, name, rid, 0]
-                        match_order.append(match_key)
-                    matches_by_key[match_key][3] = int(matches_by_key[match_key][3]) + score
+                    match = (code, name, rid, score)
+                    if is_exact_first_token:
+                        exact_first_matches.append(match)
+                    else:
+                        fallback_matches.append(match)
+
+            token_matches = exact_first_matches if len(exact_first_matches) == 1 else exact_first_matches + fallback_matches
+            for code, name, rid, score in token_matches:
+                match_key = (code, name, rid)
+                if match_key not in matches_by_key:
+                    matches_by_key[match_key] = [code, name, rid, 0]
+                    match_order.append(match_key)
+                matches_by_key[match_key][3] = int(matches_by_key[match_key][3]) + score
 
     matches: List[Tuple[Optional[str], Optional[str], Optional[str], int]] = []
     for match_key in match_order:
@@ -341,6 +374,7 @@ def find_bls_matches_for_text(
 
 PHRASE_MAX_CANDIDATE_GROUPS = 3
 PHRASE_MIN_DOMINANCE = 0.5
+EXACT_MATCH_BONUS = 20
 
 
 def rank_phrase_groups(
@@ -370,14 +404,29 @@ def rank_phrase_groups(
 def phrase_is_too_ambiguous(group_count: int, max_score: int, total_score: int) -> bool:
     """Prüft, ob eine Phrase zu viele plausible Gruppen hat.
 
-    Wenn mehr als `PHRASE_MAX_CANDIDATE_GROUPS` Gruppen gleichzeitig auftreten
-    oder die führende Gruppe nicht klar dominiert, wird die Phrase nicht zugeordnet.
+    Nur blockieren wenn:
+    - Extrem viele Gruppen (> 5), ODER
+    - Schwache Dominanz (<= 50%), ODER
+    - Mehrere Gruppen (> 3) UND keine klare Mehrheit (< 55%)
     """
 
-    if group_count > PHRASE_MAX_CANDIDATE_GROUPS:
+    if not total_score:
+        return False
+
+    dominance = max_score / total_score
+
+    # Extrem viele Gruppen → blockieren
+    if group_count > 5:
         return True
-    if total_score and (max_score / total_score) < PHRASE_MIN_DOMINANCE:
+
+    # Keine Dominanz → blockieren
+    if dominance <= 0.5:
         return True
+
+    # Mehrere Gruppen + schwache Dominanz → blockieren
+    if group_count > PHRASE_MAX_CANDIDATE_GROUPS and dominance < 0.55:
+        return True
+
     return False
 
 ADDITIONAL_NOTE_TAG_PATTERNS = {
