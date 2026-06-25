@@ -82,6 +82,41 @@ def tokenize(s: str) -> List[str]:
     return tokens
 
 
+def compound_token_variants(token: str) -> List[str]:
+    """Erzeugt Fallback-Varianten für zusammengesetzte Tokens.
+
+    Direkte Treffer bleiben Vorrang. Wenn ein Token wie `saatenbrot` keinen
+    Direkttreffer liefert, helfen Teilstücke wie `saaten` und `brot` weiter.
+    
+    Nur für längere Tokens (10+ Zeichen) werden Varianten generiert.
+    """
+
+    token = normalize_text(token)
+    if not token:
+        return []
+
+    variants = [token]
+    if len(token) < 10:
+        return variants
+
+    for split_pos in range(4, len(token) - 3):
+        prefix = token[:split_pos]
+        suffix = token[split_pos:]
+        if len(prefix) >= 4:
+            variants.append(prefix)
+        if len(suffix) >= 4:
+            variants.append(suffix)
+
+    unique_variants: List[str] = []
+    seen: set[str] = set()
+    for variant in variants:
+        if variant in seen:
+            continue
+        seen.add(variant)
+        unique_variants.append(variant)
+    return unique_variants
+
+
 def token_matches_keyword(token: str, kw: str) -> bool:
     """"Stemming light" Match zwischen Token und Keyword.
 
@@ -150,24 +185,86 @@ def split_candidate_phrases(raw_text: str) -> List[str]:
     return cleaned or ([text] if text else [])
 
 
-def find_bls_matches_for_text(conn: sqlite3.Connection, raw_text: str) -> List[Tuple[Optional[str], Optional[str], Optional[str]]]:
+def score_bls_row(name: str, query_tokens: List[str]) -> int:
+    """Zählt, wie viele Query-Tokens im BLS-Namen wiedergefunden werden."""
+
+    if not name or not query_tokens:
+        return 0
+
+    hits = 0
+    name_tokens = tokenize(normalize_text(str(name)))
+
+    for tok in query_tokens:
+        if any(
+            token_matches_keyword(nt, tok) or token_matches_keyword(tok, nt)
+            for nt in name_tokens
+        ):
+            hits += 1
+
+    return hits
+
+
+def find_bls_matches_for_text(
+    conn: sqlite3.Connection, raw_text: str
+) -> List[Tuple[Optional[str], Optional[str], Optional[str], int]]:
     """Sucht BLS-Treffer für den Gesamttext und seine Kandidatenphrasen.
 
-    Rückgabe: Liste von (code, name, id) in Fundreihenfolge, ohne Duplikate.
+    Rückgabe: Liste von (code, name, id, score) in Fundreihenfolge, ohne Duplikate.
+    Dabei wird pro Phrase jeder Token einzeln gegen die BLS-DB geprüft und die
+    Evidenz pro BLS-Zeile aufaddiert.
     """
 
-    matches: List[Tuple[Optional[str], Optional[str], Optional[str]]] = []
-    seen: set[Tuple[Optional[str], Optional[str], Optional[str]]] = set()
+    matches_by_key: Dict[Tuple[Optional[str], Optional[str], Optional[str]], List[object]] = {}
+    match_order: List[Tuple[Optional[str], Optional[str], Optional[str]]] = []
 
     for phrase in split_candidate_phrases(raw_text):
-        code, name, rid = bls_best_match(conn, phrase)
-        if not code or not name:
+        t, name_col, id_col, code_col = detect_table_and_columns(conn)
+        if not t or not name_col:
             continue
-        match = (code, name, rid)
-        if match in seen:
+
+        tokens = tokenize(phrase)
+        if not tokens:
             continue
-        seen.add(match)
-        matches.append(match)
+
+        cur = conn.cursor()
+        for token in tokens:
+            search_variants = compound_token_variants(token)
+
+            for search_token in search_variants:
+                where_sql = f"LOWER({name_col}) LIKE ?"
+                params = [f"%{search_token}%"]
+
+                select_cols = [name_col]
+                if code_col:
+                    select_cols.append(code_col)
+                if id_col:
+                    select_cols.append(id_col)
+                sql = f"SELECT {', '.join(select_cols)} FROM {t} WHERE {where_sql} LIMIT 25"
+
+                rows = cur.execute(sql, params).fetchall()
+                for row in rows:
+                    name = str(row[0])
+                    code = row[1] if code_col and len(row) > 1 else None
+                    rid = None
+                    if code_col and id_col and len(row) > 2:
+                        rid = row[2]
+                    elif id_col and len(row) > 1 and not code_col:
+                        rid = row[1]
+
+                    score = score_bls_row(name, [search_token])
+                    if score <= 0:
+                        continue
+
+                    match_key = (code, name, rid)
+                    if match_key not in matches_by_key:
+                        matches_by_key[match_key] = [code, name, rid, 0]
+                        match_order.append(match_key)
+                    matches_by_key[match_key][3] = int(matches_by_key[match_key][3]) + score
+
+    matches: List[Tuple[Optional[str], Optional[str], Optional[str], int]] = []
+    for match_key in match_order:
+        code, name, rid, score = matches_by_key[match_key]
+        matches.append((code, name, rid, int(score)))
 
     return matches
 
@@ -332,7 +429,12 @@ def enrich_plan(
     bls_db_path: Optional[Path] = None,
     code_letter_map: Optional[Dict[str, List[str]]] = None,
 ) -> Tuple[dict, dict]:
-    """Enriched den gesamten Plan per BLS-Code-Letter-Mapping."""
+    """Enriched den gesamten Plan per BLS-Code-Letter-Mapping.
+    
+    WICHTIG: Pro Phrase (Zutat) wird eine SEPARATE Bewertung durchgeführt.
+    Dies stellt sicher, dass "Hähnchen mit Reis" ZWEI Gruppen erhält
+    (meat von Hähnchen, grains_potatoes von Reis), nicht nur eine.
+    """
 
     stats = {"total_items": 0, "mapped_groups": 0, "mapped_via_bls": 0, "still_unmapped": 0}
     code_letter_map = code_letter_map or {}
@@ -352,34 +454,70 @@ def enrich_plan(
                 raw_text = item.get("raw_text", "") or ""
                 tags = sorted(set(collect_note_tags(item.get("notes") or [])))
 
-                groups: List[str] = []
-                bls_matches = []
-
+                # Neue Logik: Pro Phrase eine eigene Bewertung
+                all_phrases_groups: List[str] = []  # Finales Ergebnis: alle Gruppen aus allen Phrasen
+                all_bls_matches = []  # Debug: alle Matches aggregiert
+                all_group_scores: Dict[str, int] = {}  # Debug: alle Scores aggregiert
+                
                 if conn:
-                    bls_matches = find_bls_matches_for_text(conn, raw_text)
-                    for bls_code, bls_name, bls_id in bls_matches:
-                        if not bls_code:
-                            continue
-                        code = str(bls_code).strip()
-                        if not code:
-                            continue
-                        letter = code[0].upper()
-                        mapped_groups = code_letter_map.get(letter, [])
-                        for group in mapped_groups:
-                            if group not in groups:
-                                groups.append(group)
+                    # Teile Text in Phrasen auf
+                    phrases = split_candidate_phrases(raw_text)
+                    
+                    for phrase in phrases:
+                        # Pro Phrase: suche BLS-Matches
+                        phrase_matches = find_bls_matches_for_text(conn, phrase)
+                        all_bls_matches.extend(phrase_matches)
+                        
+                        # Pro Phrase: berechne Gruppe-Scores
+                        phrase_group_scores: Dict[str, int] = {}
+                        phrase_group_first_seen: Dict[str, int] = {}
+                        
+                        for bls_code, bls_name, bls_id, score in phrase_matches:
+                            if not bls_code:
+                                continue
+                            code = str(bls_code).strip()
+                            if not code:
+                                continue
+                            letter = code[0].upper()
+                            mapped_groups = code_letter_map.get(letter, [])
+                            for group in mapped_groups:
+                                if str(group).strip().lower() == "other":
+                                    continue
+                                phrase_group_scores[group] = phrase_group_scores.get(group, 0) + score
+                                all_group_scores[group] = all_group_scores.get(group, 0) + score
+                                if group not in phrase_group_first_seen:
+                                    phrase_group_first_seen[group] = len(phrase_group_first_seen)
+                        
+                        # Pro Phrase: nimm die beste Gruppe
+                        if phrase_group_scores:
+                            max_score = max(phrase_group_scores.values())
+                            phrase_best_groups = sorted(
+                                [g for g, s in phrase_group_scores.items() if s == max_score],
+                                key=lambda g: phrase_group_first_seen.get(g, float('inf')),
+                            )
+                            # Füge nur die beste Gruppe der Phrase hinzu (keine Duplikate)
+                            for group in phrase_best_groups:
+                                if group not in all_phrases_groups:
+                                    all_phrases_groups.append(group)
 
+                groups = all_phrases_groups
                 links = item.get("links") or {}
                 links["food_group"] = groups[0] if groups else None
-                links["confidence"] = 1.0 if groups else 0.0
-                if bls_matches:
-                    first_code, first_name, first_id = bls_matches[0]
+                
+                # Confidence: Top-Score / Total-Score (für Debug)
+                total_group_score = sum(all_group_scores.values())
+                top_group_score = all_group_scores.get(groups[0], 0) if groups else 0
+                links["confidence"] = (top_group_score / total_group_score) if total_group_score else 0.0
+                
+                if all_bls_matches:
+                    first_code, first_name, first_id, _first_score = all_bls_matches[0]
                     links["bls_id"] = first_id
                     links["bls_name"] = first_name
                     links["bls_matches"] = [
-                        {"code": code, "name": name, "id": rid}
-                        for code, name, rid in bls_matches
+                        {"code": code, "name": name, "id": rid, "score": score}
+                        for code, name, rid, score in all_bls_matches
                     ]
+                    links["group_scores"] = all_group_scores
 
                 item["food_groups"] = groups
                 item["links"] = links

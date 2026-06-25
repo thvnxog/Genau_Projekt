@@ -126,6 +126,132 @@ def test_enrich_plan_combines_multiple_groups_for_composite_dishes(tmp_path):
     assert item["links"]["bls_matches"][1]["name"] == "Reis"
 
 
+def test_enrich_plan_chooses_majority_group_for_shared_token(tmp_path):
+    db_path = tmp_path / "bls.db"
+    conn = sqlite3.connect(db_path)
+    conn.execute("CREATE TABLE foods (id INTEGER PRIMARY KEY, name_de TEXT, code TEXT)")
+    conn.executemany(
+        "INSERT INTO foods (id, name_de, code) VALUES (?, ?, ?)",
+        [
+            (1, "Spinat frisch", "G111000"),
+            (2, "Rahmspinat", "G222000"),
+            (3, "Spinat mit Rahm", "M333000"),
+        ],
+    )
+    conn.commit()
+    conn.close()
+
+    mapping_path = tmp_path / "mapping.json"
+    mapping_path.write_text(
+        '{"code_letter_mapping": {"G": ["vegetables"], "M": ["dairy"]}}',
+        encoding="utf-8",
+    )
+
+    plan = build_plan("Spinat")
+    code_letter_map = load_code_letter_mapping(mapping_path)
+    enriched, stats = enrich_plan(plan, bls_db_path=db_path, code_letter_map=code_letter_map)
+
+    item = enriched["days"][0]["menus"][0]["items"][0]
+
+    assert stats["mapped_groups"] == 1
+    assert item["food_groups"] == ["vegetables"]
+    assert item["links"]["food_group"] == "vegetables"
+    assert item["links"]["confidence"] == 2 / 3
+    assert item["links"]["group_scores"]["vegetables"] == 2
+    assert item["links"]["group_scores"].get("dairy", 0) == 1
+
+
+def test_enrich_plan_prefers_dairy_for_yoghurt_compound(tmp_path):
+    db_path = tmp_path / "bls.db"
+    conn = sqlite3.connect(db_path)
+    conn.execute("CREATE TABLE foods (id INTEGER PRIMARY KEY, name_de TEXT, code TEXT)")
+    conn.executemany(
+        "INSERT INTO foods (id, name_de, code) VALUES (?, ?, ?)",
+        [
+            (1, "Joghurt natur", "M111000"),
+            (2, "Joghurt mit Kräutern", "M222000"),
+            (3, "Minzdip", "H333000"),
+        ],
+    )
+    conn.commit()
+    conn.close()
+
+    mapping_path = tmp_path / "mapping.json"
+    mapping_path.write_text(
+        '{"code_letter_mapping": {"M": ["dairy"], "H": ["legumes"]}}',
+        encoding="utf-8",
+    )
+
+    plan = build_plan("Joghurt-Minzdipp")
+    code_letter_map = load_code_letter_mapping(mapping_path)
+    enriched, stats = enrich_plan(plan, bls_db_path=db_path, code_letter_map=code_letter_map)
+
+    item = enriched["days"][0]["menus"][0]["items"][0]
+
+    assert stats["mapped_groups"] == 1
+    assert item["food_groups"] == ["dairy"]
+    assert item["links"]["food_group"] == "dairy"
+    assert item["links"]["confidence"] > 0.5
+
+
+def test_enrich_plan_finds_bread_in_compound_token(tmp_path):
+    db_path = tmp_path / "bls.db"
+    conn = sqlite3.connect(db_path)
+    conn.execute("CREATE TABLE foods (id INTEGER PRIMARY KEY, name_de TEXT, code TEXT)")
+    conn.execute(
+        "INSERT INTO foods (id, name_de, code) VALUES (?, ?, ?)",
+        (1, "Brot", "C444000"),
+    )
+    conn.commit()
+    conn.close()
+
+    mapping_path = tmp_path / "mapping.json"
+    mapping_path.write_text(
+        '{"code_letter_mapping": {"C": ["grains_potatoes"]}}',
+        encoding="utf-8",
+    )
+
+    plan = build_plan("Saatenbrot")
+    code_letter_map = load_code_letter_mapping(mapping_path)
+    enriched, stats = enrich_plan(plan, bls_db_path=db_path, code_letter_map=code_letter_map)
+
+    item = enriched["days"][0]["menus"][0]["items"][0]
+
+    assert stats["mapped_groups"] == 1
+    assert item["food_groups"] == ["grains_potatoes"]
+    assert item["links"]["food_group"] == "grains_potatoes"
+
+
+def test_enrich_plan_ignores_other_group(tmp_path):
+    db_path = tmp_path / "bls.db"
+    conn = sqlite3.connect(db_path)
+    conn.execute("CREATE TABLE foods (id INTEGER PRIMARY KEY, name_de TEXT, code TEXT)")
+    conn.execute(
+        "INSERT INTO foods (id, name_de, code) VALUES (?, ?, ?)",
+        (1, "Sonderfall", "Q999000"),
+    )
+    conn.commit()
+    conn.close()
+
+    mapping_path = tmp_path / "mapping.json"
+    mapping_path.write_text(
+        '{"code_letter_mapping": {"Q": ["other"]}}',
+        encoding="utf-8",
+    )
+
+    plan = build_plan("Sonderfall")
+    code_letter_map = load_code_letter_mapping(mapping_path)
+    enriched, stats = enrich_plan(plan, bls_db_path=db_path, code_letter_map=code_letter_map)
+
+    item = enriched["days"][0]["menus"][0]["items"][0]
+
+    assert stats["mapped_groups"] == 0
+    assert stats["still_unmapped"] == 1
+    assert item["food_groups"] == []
+    assert item["links"]["food_group"] is None
+    assert item["links"]["confidence"] == 0.0
+
+
 def test_collect_note_tags_maps_excel_additions_to_tags():
     notes = [
         "Bio",
