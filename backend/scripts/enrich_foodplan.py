@@ -265,6 +265,13 @@ def split_candidate_phrases(raw_text: str) -> List[str]:
     return cleaned or ([text] if text else [])
 
 
+def first_candidate_phrase(text: str) -> str:
+    """Gibt den ersten groben Phrasenteil zurück."""
+
+    phrases = split_candidate_phrases(text)
+    return phrases[0] if phrases else ""
+
+
 def score_bls_row(name: str, query_tokens: List[str]) -> int:
     """Zählt, wie viele Query-Tokens im BLS-Namen wiedergefunden werden."""
 
@@ -338,16 +345,34 @@ def find_bls_matches_for_text(
                     elif id_col and len(row) > 1 and not code_col:
                         rid = row[1]
 
+                    code_prefix = str(code or "").strip().upper()[:1]
+                    allow_bonus = code_prefix != "Y"
+
                     score = score_bls_row(name, [search_token])
                     if score <= 0:
                         continue
 
                     name_tokens = tokenize(normalize_text(name))
+                    first_name_phrase_tokens = tokenize(first_candidate_phrase(name))
                     is_exact_first_token = bool(name_tokens) and token_exactly_matches_keyword(
                         name_tokens[0], search_token
                     )
-                    if is_exact_first_token:
+                    is_contained_anywhere = any(
+                        token_matches_keyword(name_token, search_token)
+                        for name_token in name_tokens
+                    )
+                    is_contained_in_first_phrase = any(
+                        token_matches_keyword(name_token, search_token)
+                        for name_token in first_name_phrase_tokens
+                    )
+                    if allow_bonus and code_prefix == "X" and is_exact_first_token:
                         score += EXACT_MATCH_BONUS
+                    elif allow_bonus and code_prefix == "X" and is_contained_anywhere:
+                        score += CONTAINED_MATCH_BONUS
+                    elif allow_bonus and is_exact_first_token:
+                        score += EXACT_MATCH_BONUS
+                    elif allow_bonus and is_contained_in_first_phrase:
+                        score += CONTAINED_MATCH_BONUS
 
                     match_key = (code, name, rid)
                     match = (code, name, rid, score)
@@ -375,6 +400,7 @@ def find_bls_matches_for_text(
 PHRASE_MAX_CANDIDATE_GROUPS = 3
 PHRASE_MIN_DOMINANCE = 0.5
 EXACT_MATCH_BONUS = 20
+CONTAINED_MATCH_BONUS = 10
 
 
 def rank_phrase_groups(

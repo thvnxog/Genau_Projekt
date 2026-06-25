@@ -21,6 +21,9 @@ from typing import Optional
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from scripts.enrich_foodplan import (
+    _db_path_for_connection,
+    _load_known_terms_from_db_path,
+    detect_table_and_columns,
     split_candidate_phrases,
     tokenize,
     compound_token_variants,
@@ -83,16 +86,33 @@ def debug_phrase_splitting(logger: DebugLogger, raw_text: str):
     return phrases
 
 
-def debug_tokenization(logger: DebugLogger, text: str):
+def debug_tokenization(logger: DebugLogger, text: str, conn: sqlite3.Connection | None = None):
     """Debug die Tokenisierung."""
     logger.section("2. TOKENISIERUNG")
     logger.log(f"Input: '{text}'")
     
     tokens = tokenize(text)
     logger.log(f"Anzahl Tokens: {len(tokens)}", "SUCCESS")
+
+    known_terms = None
+    if conn:
+        t, name_col, _, _ = detect_table_and_columns(conn)
+        db_path = _db_path_for_connection(conn)
+        if t and name_col and db_path:
+            known_terms = set(_load_known_terms_from_db_path(db_path, t, name_col))
+
     logger.push()
     for token in tokens:
         logger.log(f"Token: '{token}' ({len(token)} chars)", "DEBUG")
+        variants = compound_token_variants(token, known_terms)
+        if len(variants) == 1:
+            logger.log(f"  → Varianten: {variants[0]}", "INFO")
+        else:
+            logger.log(f"  → Varianten ({len(variants)} Stück):", "WARNING")
+            logger.push()
+            for i, variant in enumerate(variants, 1):
+                logger.log(f"{i}. '{variant}'", "DEBUG")
+            logger.pop()
     logger.pop()
     return tokens
 
@@ -266,7 +286,7 @@ def debug_foodplan_item(
         # Step 2: Tokenization
         phrases = split_candidate_phrases(raw_text)
         for phrase in phrases:
-            debug_tokenization(logger, phrase)
+            debug_tokenization(logger, phrase, conn)
         
         # Step 3: BLS matching
         debug_bls_matches(logger, conn, raw_text)
