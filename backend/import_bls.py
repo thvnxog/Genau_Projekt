@@ -3,10 +3,6 @@ import_bls.py
 
 Dieses Skript importiert Daten aus der offiziellen BLS-Exceldatei in unsere SQLite-Datenbank.
 
-Warum ein separates Import-Skript?
-- Die Exceldatei ist groß und das Einlesen dauert.
-- Wir importieren deshalb einmal in eine DB und verwenden danach nur noch SQL (schnell).
-
 Wie wird es benutzt?
 - `python backend/import_bls.py`
 - Falls die Excel nicht unter `data/` liegt, kann der Pfad per Environment Variable gesetzt werden:
@@ -14,34 +10,23 @@ Wie wird es benutzt?
 """
 
 import os
+from pathlib import Path
 
-# pandas: liest Excel komfortabel und behandelt NaN/fehlende Werte.
 import pandas as pd
+from sqlalchemy import text
 
-# Wir nutzen die gleiche App/DB-Konfiguration wie der Server.
 from app import create_app
 from models import db, Food
 
-# --- Konfiguration -------------------------------------------------------------
-# Default-Pfad zur Excel (relativ zu `backend/` gedacht).
-# Über `BLS_XLSX_PATH` kann man den Pfad überschreiben, ohne Code zu ändern.
-DEFAULT_XLSX = os.getenv("BLS_XLSX_PATH", "../data/BLS_4_0_Daten_2025_DE.xlsx")
+BACKEND_DIR = Path(__file__).resolve().parent
+DEFAULT_XLSX = os.getenv(
+    "BLS_XLSX_PATH",
+    str(BACKEND_DIR.parent / "data" / "BLS_4_0_Daten_2025_DE.xlsx"),
+)
 
 
 def safe_float(value):
-    """Konvertiert Excel-Zellen robust zu float.
-
-    Hintergrund:
-    - In Excel können Zellen leer sein (NaN) oder als Text vorliegen.
-    - SQLAlchemy-Spalten erwarten für numerische Werte entweder float oder None.
-
-    Rückgabe:
-    - `float`, wenn konvertierbar
-    - `None`, wenn leer/NaN oder nicht konvertierbar
-    """
-
     try:
-        # pandas markiert fehlende Werte meist als NaN
         if pd.isna(value):
             return None
         return float(value)
@@ -49,88 +34,96 @@ def safe_float(value):
         return None
 
 
+def ensure_foods_code_column() -> None:
+    """Stellt sicher, dass die bestehende `foods`-Tabelle die Spalte `code` hat.
+
+    `db.create_all()` erweitert bestehende Tabellen nicht. Für ältere SQLite-DBs
+    wird die Spalte deshalb bei Bedarf per `ALTER TABLE` nachgezogen.
+    """
+
+    rows = db.session.execute(text("PRAGMA table_info(foods)")).fetchall()
+    existing_columns = {row[1] for row in rows}
+    if "code" not in existing_columns:
+        db.session.execute(text("ALTER TABLE foods ADD COLUMN code VARCHAR(64)"))
+        db.session.commit()
+
+
 def main():
-    # App erzeugen (ohne Server zu starten), damit wir DB-Config + instance_path haben.
     app = create_app()
-
-    # In Flask braucht DB-Zugriff immer einen App-Context.
-    # (Sonst weiß SQLAlchemy nicht, zu welcher App/Config es gehört.)
     with app.app_context():
-        # Falls DB/Tabellen noch nicht existieren, werden sie angelegt.
         db.create_all()
+        ensure_foods_code_column()
 
-        # Excel-Pfad bestimmen
-        xlsx_path = DEFAULT_XLSX
+        xlsx_path = Path(DEFAULT_XLSX).expanduser()
+        if not xlsx_path.is_absolute():
+            xlsx_path = (BACKEND_DIR / xlsx_path).resolve()
 
-        # Frühzeitig und verständlich abbrechen, falls Datei fehlt.
-        if not os.path.exists(xlsx_path):
+        if not xlsx_path.exists():
             raise FileNotFoundError(
-                f"Excel nicht gefunden: {xlsx_path}\n"
-                "Lege die Datei in ../data/ oder setze BLS_XLSX_PATH in deiner .env"
+                f"Excel nicht gefunden: {xlsx_path}\nLege die Datei in data/ oder setze BLS_XLSX_PATH in deiner .env"
             )
 
         print(f"Lese Excel ein: {xlsx_path}")
+        df = pd.read_excel(str(xlsx_path))
 
-        # Excel einlesen (pandas erkennt Tabellenblatt & Datentypen automatisch).
-        # Falls nötig könnte man später: sheet_name=..., usecols=..., dtype=...
-        df = pd.read_excel(xlsx_path)
-
-        # --- Spalten-Mapping -----------------------------------------------------
-        # Diese Namen entsprechen den Spalten in der BLS-Datei.
-        # Wichtig: Wenn BLS-Versionen sich ändern, können die Namen abweichen.
+        # --- Spalten-Mapping -------------------------------------------------
         NAME_COL = "Lebensmittelbezeichnung"
-        # ENERCJ_COL = "ENERCJ Energie (Kilojoule) [kJ/100g]"  # derzeit nicht importiert
         ENERCC_COL = "ENERCC Energie (Kilokalorien) [kcal/100g]"
         WATER_COL = "WATER Wasser [g/100g]"
         PROT_COL = "PROT625 Protein (Nx6,25) [g/100g]"
         FAT_COL = "FAT Fett [g/100g]"
         CHO_COL = "CHO Kohlenhydrate, verfügbar [g/100g]"
 
-        # Sicherheitscheck: existieren die Pflichtspalten?
-        # Wenn nicht, ist die BLS-Datei vermutlich eine andere Version oder anders formatiert.
         required = [NAME_COL]
         for col in required:
             if col not in df.columns:
                 raise KeyError(f"Spalte fehlt in Excel: {col}")
 
-        # Alte Einträge werden vor dem Import gelöscht.
+        # mögliche Namen für eine Code/Schlüssel-Spalte in der Excel
+        POSSIBLE_CODE_COLS = [
+            "BLS Code",
+            "BLS_Code",
+            "Schluessel",
+            "Schlüssel",
+            "Schluesselnummer",
+            "ID",
+            "id",
+            "code",
+            "Code",
+            "KEY",
+            "Key",
+        ]
+        code_col = next((c for c in df.columns if c in POSSIBLE_CODE_COLS), None)
+
         print("Lösche alte Datensätze...")
         Food.query.delete()
         db.session.commit()
 
         print(f"Importiere {len(df)} Zeilen...")
-
-        # Objekte sammeln und in einem Rutsch speichern (Performance)
         objects: list[Food] = []
 
         for _, row in df.iterrows():
-            # Lebensmittelname ist Pflichtfeld.
             name = str(row.get(NAME_COL, "")).strip()
             if not name:
                 continue
 
-            # Food-ORM-Objekt bauen.
-            # safe_float sorgt dafür, dass leere/ungültige Zellen als None landen.
             obj = Food(
                 name_de=name,
-                # energy_kj=safe_float(row.get(ENERCJ_COL)),
                 energy_kcal=safe_float(row.get(ENERCC_COL)),
                 water_g=safe_float(row.get(WATER_COL)),
                 protein_g=safe_float(row.get(PROT_COL)),
                 fat_g=safe_float(row.get(FAT_COL)),
                 carbs_g=safe_float(row.get(CHO_COL)),
+                code=(str(row.get(code_col)).strip() if code_col and not pd.isna(row.get(code_col)) else None),
             )
             objects.append(obj)
 
-        # bulk_save_objects ist deutlich schneller als pro Zeile committen.
-        # Danach einmal committen, damit die Daten in der DB landen.
         db.session.bulk_save_objects(objects)
         db.session.commit()
 
         print(f"Fertig! Importiert: {len(objects)} Einträge")
-        print("Du kannst jetzt den Server starten und /foods durchsuchen.")
 
 
 if __name__ == "__main__":
-    # Direktaufruf über CLI
     main()
+

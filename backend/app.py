@@ -199,12 +199,12 @@ def create_app():
         return plan
 
     def resolve_bls_db_path(base_dir: Path) -> Path | None:
-        """Liefert den Pfad zur BLS-DB für den Enrichment-Fallback.
+        """Liefert den Pfad zur BLS-DB für das Enrichment.
 
         Priorität:
         1) `BLS_DB_PATH` aus der Umgebung (absolut oder relativ zu `backend/`)
         2) `backend/instance/bls.db`, falls vorhanden
-        3) `None` (Fallback deaktiviert)
+        3) `None`, wenn keine Datenbank gefunden wurde
         """
 
         env_path = (os.getenv("BLS_DB_PATH") or "").strip()
@@ -255,7 +255,7 @@ def create_app():
             )
 
         from scripts.enrich_foodplan import (
-            load_json_mapping,
+            load_code_letter_mapping,
             enrich_plan,
         )
 
@@ -264,7 +264,7 @@ def create_app():
 
         logger.debug("Loading enrichment mapping from %s", mapping_json)
 
-        group_keywords, tag_keywords = load_json_mapping(mapping_json)
+        code_letter_map = load_code_letter_mapping(mapping_json)
 
         bls_db_path = resolve_bls_db_path(base_dir)
         if bls_db_path is None or not bls_db_path.exists():
@@ -282,9 +282,8 @@ def create_app():
 
         plan, stats = enrich_plan(
             plan,
-            group_keywords,
-            tag_keywords,
             bls_db_path=bls_db_path,
+            code_letter_map=code_letter_map,
         )
         plan = normalize_plan(plan)
 

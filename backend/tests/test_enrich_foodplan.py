@@ -1,10 +1,9 @@
 import sqlite3
 
-from scripts.enrich_foodplan import detect_table_and_columns, enrich_plan, bls_best_match
+from scripts.enrich_foodplan import collect_note_tags, detect_table_and_columns, enrich_plan, load_code_letter_mapping
 
 
 def build_plan(raw_text: str, portion_value: float = 100.0) -> dict:
-    # Kleines Hilfsobjekt für mehrere Tests: ein Plan mit genau einem Gericht.
     return {
         "schema_version": "1.0",
         "days": [
@@ -21,6 +20,7 @@ def build_plan(raw_text: str, portion_value: float = 100.0) -> dict:
                                 "food_groups": [],
                                 "links": {
                                     "bls_id": None,
+                                    "bls_name": None,
                                     "food_group": None,
                                     "confidence": None,
                                 },
@@ -34,88 +34,122 @@ def build_plan(raw_text: str, portion_value: float = 100.0) -> dict:
     }
 
 
-def test_enrich_plan_detects_multiple_groups_and_tags():
-    # Ein Gericht kann mehrere Gruppen und Tags gleichzeitig bekommen.
-    plan = build_plan("Fisch mit Gemüse und Vollkornbrot")
+def test_enrich_plan_maps_dge_group_from_bls_code_letter(tmp_path):
+    db_path = tmp_path / "bls.db"
+    conn = sqlite3.connect(db_path)
+    conn.execute("CREATE TABLE foods (id INTEGER PRIMARY KEY, name_de TEXT, code TEXT)")
+    conn.execute(
+        "INSERT INTO foods (id, name_de, code) VALUES (?, ?, ?)",
+        (1, "Hafer Flocken", "C131000"),
+    )
+    conn.commit()
+    conn.close()
 
-    group_keywords = {
-        "fish": ["fisch"],
-        "vegetables": ["gemüse"],
-        "grains_potatoes": ["brot"],
-    }
-    tag_keywords = {"wholegrain": ["vollkorn"]}
+    mapping_path = tmp_path / "mapping.json"
+    mapping_path.write_text(
+        '{"code_letter_mapping": {"C": ["grains_potatoes"]}}',
+        encoding="utf-8",
+    )
 
-    enriched, stats = enrich_plan(plan, group_keywords, tag_keywords)
+    plan = build_plan("Hafer")
+    code_letter_map = load_code_letter_mapping(mapping_path)
+    enriched, stats = enrich_plan(plan, bls_db_path=db_path, code_letter_map=code_letter_map)
 
     item = enriched["days"][0]["menus"][0]["items"][0]
 
     assert stats["total_items"] == 1
     assert stats["mapped_groups"] == 1
+    assert stats["mapped_via_bls"] == 1
     assert stats["still_unmapped"] == 0
-    assert item["food_groups"] == ["fish", "grains_potatoes", "vegetables"]
-    assert item["links"]["food_group"] == "fish"
+    assert item["food_groups"] == ["grains_potatoes"]
+    assert item["links"]["food_group"] == "grains_potatoes"
     assert item["links"]["confidence"] == 1.0
-    assert item["tags"] == ["wholegrain"]
+    assert item["links"]["bls_id"] == 1
+    assert item["links"]["bls_name"] == "Hafer Flocken"
 
 
-def test_enrich_plan_uses_bls_fallback_when_keywords_do_not_match(tmp_path):
-    # Wenn Keywords nicht greifen, versucht das Enrichment die BLS-Datenbank als Fallback.
-    plan = build_plan("Pfanne")
-
-    group_keywords = {"vegetables": ["gemüse"]}
-    tag_keywords = {}
-
+def test_enrich_plan_leaves_item_unmapped_without_code_mapping(tmp_path):
     db_path = tmp_path / "bls.db"
     conn = sqlite3.connect(db_path)
-    conn.execute("CREATE TABLE foods (id INTEGER PRIMARY KEY, name TEXT)")
-    conn.execute("INSERT INTO foods (id, name) VALUES (?, ?)", (1, "Gemüsepfanne"))
+    conn.execute("CREATE TABLE foods (id INTEGER PRIMARY KEY, name_de TEXT, code TEXT)")
+    conn.execute(
+        "INSERT INTO foods (id, name_de, code) VALUES (?, ?, ?)",
+        (7, "Gemüsepfanne", "G111000"),
+    )
     conn.commit()
     conn.close()
 
-    enriched, stats = enrich_plan(plan, group_keywords, tag_keywords, db_path)
+    plan = build_plan("Gemüsepfanne")
+    enriched, stats = enrich_plan(plan, bls_db_path=db_path, code_letter_map={})
 
     item = enriched["days"][0]["menus"][0]["items"][0]
 
-    assert stats["unmapped_before_bls"] == 1
-    assert stats["mapped_via_bls"] == 1
-    assert item["food_groups"] == ["vegetables"]
-    assert item["links"]["food_group"] == "vegetables"
-    assert item["links"]["bls_id"] == 1
-    assert item["links"]["bls_name"] == "Gemüsepfanne"
-
-
-def test_enrich_plan_rejects_false_positive_meat_tags_for_vegetarian_dishes():
-    # Negativfall: Ein vegetarisches Schnitzel sollte nicht als Fleischgericht gezählt werden.
-    plan = build_plan("Vegetarisches Schnitzel")
-
-    group_keywords = {
-        "meat": ["fleisch", "hähnchen", "rind", "schwein"],
-        "vegetables": ["gemüse"],
-    }
-    tag_keywords = {}
-
-    enriched, stats = enrich_plan(plan, group_keywords, tag_keywords)
-    item = enriched["days"][0]["menus"][0]["items"][0]
-
+    assert stats["mapped_groups"] == 0
+    assert stats["still_unmapped"] == 1
     assert item["food_groups"] == []
     assert item["links"]["food_group"] is None
     assert item["links"]["confidence"] == 0.0
-    assert stats["mapped_groups"] == 0
+    assert item["links"]["bls_id"] == 7
+    assert item["links"]["bls_name"] == "Gemüsepfanne"
 
 
-def test_bls_fallback_prefers_name_de_column(tmp_path):
-    # Die reale BLS-DB nutzt name_de als Spalte für Lebensmittelbezeichnungen.
+def test_enrich_plan_combines_multiple_groups_for_composite_dishes(tmp_path):
     db_path = tmp_path / "bls.db"
     conn = sqlite3.connect(db_path)
-    conn.execute("CREATE TABLE foods (id INTEGER PRIMARY KEY, name_de TEXT)")
-    conn.execute(
-        "INSERT INTO foods (id, name_de) VALUES (?, ?)",
-        (7, "Pizza Salame (mit Tomatensauce, Mozzarella, Salami)"),
+    conn.execute("CREATE TABLE foods (id INTEGER PRIMARY KEY, name_de TEXT, code TEXT)")
+    conn.executemany(
+        "INSERT INTO foods (id, name_de, code) VALUES (?, ?, ?)",
+        [
+            (1, "Hähnchenbrust", "U111000"),
+            (2, "Reis", "C222000"),
+        ],
     )
     conn.commit()
+    conn.close()
 
-    assert detect_table_and_columns(conn) == ("foods", "name_de", "id")
-    assert bls_best_match(conn, "pizza salame") == (
-        7,
-        "Pizza Salame (mit Tomatensauce, Mozzarella, Salami)",
+    mapping_path = tmp_path / "mapping.json"
+    mapping_path.write_text(
+        '{"code_letter_mapping": {"U": ["meat"], "C": ["grains_potatoes"]}}',
+        encoding="utf-8",
     )
+
+    plan = build_plan("Hähnchen mit Reis")
+    code_letter_map = load_code_letter_mapping(mapping_path)
+    enriched, stats = enrich_plan(plan, bls_db_path=db_path, code_letter_map=code_letter_map)
+
+    item = enriched["days"][0]["menus"][0]["items"][0]
+
+    assert stats["mapped_groups"] == 1
+    assert item["food_groups"] == ["meat", "grains_potatoes"]
+    assert item["links"]["food_group"] == "meat"
+    assert item["links"]["bls_matches"][0]["name"] == "Hähnchenbrust"
+    assert item["links"]["bls_matches"][1]["name"] == "Reis"
+
+
+def test_collect_note_tags_maps_excel_additions_to_tags():
+    notes = [
+        "Bio",
+        "VK: Vollkorn",
+        "M: Mageres Muskelfleisch",
+        "pf: paniert oder frittiert",
+        "TK=Tiefkühl, frisch, Konserve",
+    ]
+
+    assert collect_note_tags(notes) == [
+        "bio",
+        "canned",
+        "fresh",
+        "fried_or_breaded",
+        "frozen",
+        "lean_meat",
+        "wholegrain",
+    ]
+
+
+def test_detect_table_and_columns_prefers_foods_name_de_and_code(tmp_path):
+    db_path = tmp_path / "bls.db"
+    conn = sqlite3.connect(db_path)
+    conn.execute("CREATE TABLE foods (id INTEGER PRIMARY KEY, name_de TEXT, code TEXT)")
+
+    assert detect_table_and_columns(conn) == ("foods", "name_de", "id", "code")
+    conn.close()

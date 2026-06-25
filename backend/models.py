@@ -55,6 +55,9 @@ class Food(db.Model):
     fat_g = db.Column(db.Float, nullable=True)
     carbs_g = db.Column(db.Float, nullable=True)
 
+    # Optional: original BLS code/key (falls vorhanden in der Excel-Quelle)
+    code = db.Column(db.String(64), nullable=True, index=True)
+
     def to_dict(self) -> dict:
         """Wandelt das ORM-Objekt in ein JSON-serialisierbares Dict um.
 

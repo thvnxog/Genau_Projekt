@@ -1,42 +1,15 @@
 """backend/scripts/enrich_foodplan.py
 
-Enrichment-Skript für `foodplan.json`.
+Enrichment für `foodplan.json` auf Basis der BLS-Datenbank.
 
-Ziel:
-- Aus freiem Text (`item.raw_text`) sollen strukturierte Signale abgeleitet werden:
-  - `item.food_groups`        (Liste von Strings, z.B. ["meat"] oder [])
-  - `item.links.food_group`   (String, Fallback für Backward-Kompatibilität)
-  - `item.tags`               (Liste: "raw_veg", "fish", "wholegrain", etc.)
-  - außerdem ein Confidence-Score im `item.links`
+Ablauf pro Item:
+1) `raw_text` wird gegen die BLS-DB gematcht.
+2) Der erste Buchstabe des BLS-Codes wird über `code_letter_mapping`
+     auf DGE-Gruppen abgebildet.
+3) `food_groups`, `links.food_group`, `links.confidence` und Debug-Felder
+     werden ins Item geschrieben.
 
-Wie passiert das?
-1) Text-Normalisierung + Tokenisierung
-2) Keyword-Matching über vordefinierte Keyword-Listen
-   - Gruppen-Keywords: `rules/keywords/groups/*.txt`
-   - Tag-Keywords:     `rules/keywords/tags/*.txt`
-3) Optionaler Fallback über die BLS-DB (SQLite):
-   - Wenn kein Keyword-Match greift, versuchen wir einen groben DB-Lookup,
-     nehmen den besten Treffer-Namen und matchen darauf nochmal.
-
-Input:
-- `foodplan.json`
-
-Output:
-- `foodplan.enriched.json`
-
-Erwartetes Item-Format im Plan:
-  { "raw_text": "...", "links": {...}, "tags": [...] }
-
-Output-Format nach Enrichment:
-  { "raw_text": "...", "food_groups": [...], "links": {"food_group": "...", "confidence": 0.5}, "tags": [...] }
-
-CLI Beispiel:
-  python3 backend/scripts/enrich_foodplan.py \
-    --in backend/instance/testdata/foodplan.json \
-    --out backend/instance/testdata/foodplan.enriched.json \
-    --mapping-json backend/rules/bls_to_dge_groups.json \
-    --keywords-root backend/rules/keywords \
-    --bls-db backend/instance/bls.db
+Es gibt keinen Keyword-Fallback mehr.
 """
 
 import argparse
@@ -44,7 +17,6 @@ import json
 import re
 import sqlite3
 import unicodedata
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
@@ -52,57 +24,6 @@ from typing import Dict, List, Optional, Tuple
 # -----------------------------
 # Text Normalisierung
 # -----------------------------
-
-# Stopwords sind häufige Wörter, die kaum semantische Bedeutung für das Matching haben.
-# Durch das Entfernen reduzieren wir Rauschen in den Tokens.
-STOPWORDS = {
-    "mit",
-    "und",
-    "in",
-    "vom",
-    "von",
-    "nach",
-    "art",
-    "im",
-    "an",
-    "der",
-    "die",
-    "das",
-    "auf",
-    "für",
-    "zu",
-    "oder",
-    "sowie",
-    "inkl",
-    "inkl.",
-    "ca",
-    "ca.",
-    "tk",
-    "bio",
-}
-
-# Typische Zubereitungs-Verbstämme, die im Gerichtsnamen keine Food Group bedeuten.
-PREPARATION_VERB_STEMS = {
-    "back",
-    "brat",
-    "fritt",
-    "grill",
-    "dunst",
-    "duenst",
-    "blanch",
-    "roest",
-    "röst",
-    "gratin",
-    "panier",
-    "pochier",
-    "raeucher",
-    "räucher",
-    "ferment",
-    "schmor",
-    "marinier",
-    "wuerz",
-    "würz",
-}
 
 
 def normalize_text(s: str) -> str:
@@ -138,37 +59,11 @@ def fold_umlauts(s: str) -> str:
     )
 
 
-def is_preparation_verb_token(token: str) -> bool:
-    """Erkennt Zubereitungs-Verben/Partizipien wie "überbacken" oder "frittiert".
-
-    Diese Wörter beschreiben die Zubereitung, nicht die Lebensmittelgruppe.
-    """
-
-    if not token:
-        return False
-
-    t = token.strip().lower()
-    if not t:
-        return False
-
-    # Häufige Präfixe in Partizip-/Ableitungsformen abtrennen.
-    for prefix in ("über", "ueber", "uber", "ge"):
-        if t.startswith(prefix) and len(t) > len(prefix) + 2:
-            t = t[len(prefix) :]
-            break
-
-    for stem in PREPARATION_VERB_STEMS:
-        if t.startswith(stem):
-            return True
-
-    return False
-
-
 def tokenize(s: str) -> List[str]:
     """Zerlegt Text in Tokens.
 
     - Trennt an Nicht-Buchstaben/Ziffern
-    - Entfernt Stopwords
+    - entfernt sehr kurze Tokens
 
     Beispiel:
       "Kartoffeln mit Gemüse" -> ["kartoffeln", "gemüse"]
@@ -181,9 +76,7 @@ def tokenize(s: str) -> List[str]:
         t = t.strip()
         if not t:
             continue
-        if t in STOPWORDS:
-            continue
-        if is_preparation_verb_token(t):
+        if len(t) < 2:
             continue
         tokens.append(t)
     return tokens
@@ -218,175 +111,65 @@ def token_matches_keyword(token: str, kw: str) -> bool:
     return False
 
 
-def keyword_matches_text(raw_text: str, tokens: List[str], kw: str) -> bool:
-    """Prüft, ob ein Keyword im Item-Text matcht.
-
-    - Einzelwörter: token-basiert über token_matches_keyword
-    - Mehrwort-Keywords: direkter contains-Check im gesamten normalisierten Text
-    """
-
-    kw_norm = normalize_text(kw)
-    if not kw_norm:
-        return False
-
-    # Mehrwort-Keywords wie "alaska seelachs" funktionieren sonst nicht token-basiert.
-    if " " in kw_norm:
-        raw_norm = normalize_text(raw_text)
-        if kw_norm in raw_norm:
-            return True
-
-        raw_folded = fold_umlauts(raw_norm)
-        kw_folded = fold_umlauts(kw_norm)
-        if kw_folded and kw_folded in raw_folded:
-            return True
-        return False
-
-    for tok in tokens:
-        if token_matches_keyword(tok, kw_norm):
-            return True
-    return False
-
-
-# -----------------------------
-# Keyword-Lader (JSON-Mapping)
-# -----------------------------
-
-def load_json_mapping(path: Path) -> Tuple[Dict[str, List[str]], Dict[str, List[str]]]:
-    """Lädt Keyword-Listen aus einem JSON-Mapping.
-
-    Erwartete Struktur:
-      {
-        "mapping": [{"dge_food_group": "...", "match": {"contains_any": [...] }}, ...],
-        "tags":    [{"tag": "...",           "match": {"contains_any": [...] }}, ...]
-      }
-
-    Rückgabe:
-      group_keywords[group] = [...]
-      tag_keywords[tag]     = [...]
-    """
+def load_code_letter_mapping(path: Path) -> Dict[str, List[str]]:
+    """Lädt das Mapping von BLS-Code-Buchstaben zu DGE-Gruppen."""
 
     if not path.exists():
-        return {}, {}
+        return {}
 
     obj = json.loads(path.read_text(encoding="utf-8"))
-    group_kw: Dict[str, List[str]] = {}
-    tag_kw: Dict[str, List[str]] = {}
-
-    for r in obj.get("mapping", []) or []:
-        g = r.get("dge_food_group")
-        kws = (r.get("match", {}) or {}).get("contains_any", []) or []
-        if g:
-            group_kw.setdefault(g, [])
-            group_kw[g].extend([normalize_text(k) for k in kws if k])
-
-    for r in obj.get("tags", []) or []:
-        t = r.get("tag")
-        kws = (r.get("match", {}) or {}).get("contains_any", []) or []
-        if t:
-            tag_kw.setdefault(t, [])
-            tag_kw[t].extend([normalize_text(k) for k in kws if k])
-
-    # dedupe
-    group_kw = {k: sorted(set(v)) for k, v in group_kw.items()}
-    tag_kw = {k: sorted(set(v)) for k, v in tag_kw.items()}
-    return group_kw, tag_kw
-
-
-# --------------------
-
-@dataclass
-class MatchResult:
-    """Ergebnis eines Group-Matches."""
-
-    key: Optional[str]
-    score: float
-    hits: int
-
-
-def score_keywords(raw_text: str, tokens: List[str], keywords: List[str]) -> int:
-    """Zählt, wie viele Keywords in den Tokens "irgendwie" matchen.
-
-    Wichtig:
-    - max. 1 Hit pro Keyword (sonst könnte ein Keyword mehrfach zählen)
-    """
-
-    hits = 0
-    for kw in keywords:
-        if keyword_matches_text(raw_text, tokens, kw):
-            hits += 1
-    return hits
-
-
-def pick_best_group(raw_text: str, group_keywords: Dict[str, List[str]]) -> MatchResult:
-    """Ermittelt die beste DGE-Gruppe für `raw_text`.
-
-    Strategie:
-    - Tokenize raw_text
-    - Für jede Gruppe: zähle Keyword-Hits
-    - Nimm Gruppe mit den meisten Hits
-
-    Score:
-    - grober Confidence-Score: hits / (#keywords der Gruppe), gekappt auf 1.0
-    """
-
-    tokens = tokenize(raw_text)
-    best_key: Optional[str] = None
-    best_hits = 0
-    best_kw_len = 0
-
-    for group, kws in group_keywords.items():
-        if not kws:
+    mapping = obj.get("code_letter_mapping") or {}
+    out: Dict[str, List[str]] = {}
+    for k, v in mapping.items():
+        if not k:
             continue
-        hits = score_keywords(raw_text, tokens, kws)
-        if hits > best_hits:
-            best_hits = hits
-            best_key = group
-            best_kw_len = len(kws)
-
-    score = 0.0
-    if best_key and best_kw_len > 0:
-        score = min(1.0, best_hits / max(1, best_kw_len))
-
-    return MatchResult(best_key, score, best_hits)
+        out[k.strip().upper()] = v if isinstance(v, list) else [v]
+    return out
 
 
-def pick_matching_groups(
-    raw_text: str, group_keywords: Dict[str, List[str]]
-) -> List[MatchResult]:
-    """Ermittelt alle DGE-Gruppen, die für `raw_text` mindestens einen Treffer haben.
+def split_candidate_phrases(raw_text: str) -> List[str]:
+    """Teilt einen Gerichtsnamen in grobe Kandidatenphrasen.
 
-    Die Ergebnisse werden nach Trefferstärke sortiert, damit das erste Element
-    als primäre Gruppe verwendet werden kann.
+    Ziel ist nicht perfekte Linguistik, sondern ein robuster Heuristik-Schritt,
+    damit zusammengesetzte Namen wie "Hähnchen mit Reis" als mehrere BLS-Kandidaten
+    geprüft werden können.
     """
 
-    tokens = tokenize(raw_text)
-    matches: List[MatchResult] = []
+    if not raw_text:
+        return []
 
-    for group, kws in group_keywords.items():
-        if not kws:
+    text = normalize_text(raw_text)
+    parts = re.split(r"\s*(?:/|\+|,|;|:|\bund\b|\bmit\b|\boder\b|\bsowie\b|\bbzw\.?\b)\s*", text)
+
+    cleaned: List[str] = []
+    for part in parts:
+        candidate = part.strip()
+        if candidate:
+            cleaned.append(candidate)
+
+    return cleaned or ([text] if text else [])
+
+
+def find_bls_matches_for_text(conn: sqlite3.Connection, raw_text: str) -> List[Tuple[Optional[str], Optional[str], Optional[str]]]:
+    """Sucht BLS-Treffer für den Gesamttext und seine Kandidatenphrasen.
+
+    Rückgabe: Liste von (code, name, id) in Fundreihenfolge, ohne Duplikate.
+    """
+
+    matches: List[Tuple[Optional[str], Optional[str], Optional[str]]] = []
+    seen: set[Tuple[Optional[str], Optional[str], Optional[str]]] = set()
+
+    for phrase in split_candidate_phrases(raw_text):
+        code, name, rid = bls_best_match(conn, phrase)
+        if not code or not name:
             continue
-        hits = score_keywords(raw_text, tokens, kws)
-        if hits > 0:
-            score = min(1.0, hits / max(1, len(kws)))
-            matches.append(MatchResult(group, score, hits))
+        match = (code, name, rid)
+        if match in seen:
+            continue
+        seen.add(match)
+        matches.append(match)
 
-    matches.sort(key=lambda result: (-result.hits, -result.score, result.key or ""))
     return matches
-
-
-def collect_tags(raw_text: str, tag_keywords: Dict[str, List[str]]) -> List[str]:
-    """Sammelt alle Tags, deren Keyword-Liste mindestens einen Hit hat."""
-
-    tokens = tokenize(raw_text)
-    tags: List[str] = []
-    for tag, kws in tag_keywords.items():
-        if not kws:
-            continue
-        hits = score_keywords(raw_text, tokens, kws)
-        if hits > 0:
-            tags.append(tag)
-    return sorted(set(tags))
-
 
 ADDITIONAL_NOTE_TAG_PATTERNS = {
     "bio": [r"\bbio\b"],
@@ -422,12 +205,6 @@ def collect_note_tags(notes: List[str]) -> List[str]:
     return sorted(set(tags))
 
 
-# -----------------------------
-# Optional: BLS-Fallback (SQLite)
-# - versucht Tabellen/Spalten automatisch zu finden
-# -----------------------------
-
-# mögliche Spaltennamen in der DB
 COMMON_NAME_COLS = [
     "name_de",
     "Lebensmittelbezeichnung",
@@ -441,7 +218,7 @@ COMMON_ID_COLS = ["id", "ID", "key", "schluessel", "schlüssel", "code"]
 
 def detect_table_and_columns(
     conn: sqlite3.Connection,
-) -> Tuple[Optional[str], Optional[str], Optional[str]]:
+) -> Tuple[Optional[str], Optional[str], Optional[str], Optional[str]]:
     """Versucht in der BLS-DB die passende Tabelle/Spalten zu finden.
 
     Vorgehen:
@@ -450,20 +227,20 @@ def detect_table_and_columns(
     - Erste Tabelle mit einer Namensspalte wird genommen
 
     Rückgabe:
-    - (table_name, name_col, id_col)
+    - (table_name, name_col, id_col, code_col)
     """
 
     cur = conn.cursor()
     tables = cur.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()
     tables = [t[0] for t in tables]
 
-    # Unsere importierte BLS-DB nutzt die Tabelle `foods` mit der Namensspalte `name_de`.
     if "foods" in tables:
         cols = cur.execute("PRAGMA table_info('foods')").fetchall()
         colnames = [c[1] for c in cols]
         if "name_de" in colnames:
             id_col = next((c for c in colnames if c in COMMON_ID_COLS), None)
-            return "foods", "name_de", id_col
+            code_col = "code" if "code" in colnames else None
+            return "foods", "name_de", id_col, code_col
 
     for t in tables:
         cols = cur.execute(f"PRAGMA table_info('{t}')").fetchall()
@@ -472,31 +249,31 @@ def detect_table_and_columns(
         name_col = next((c for c in colnames if c in COMMON_NAME_COLS), None)
         if name_col:
             id_col = next((c for c in colnames if c in COMMON_ID_COLS), None)
-            return t, name_col, id_col
+            code_col = "code" if "code" in colnames else None
+            return t, name_col, id_col, code_col
 
-    return None, None, None
+    return None, None, None, None
 
 
 def bls_best_match(
     conn: sqlite3.Connection, query_text: str, limit: int = 10
-) -> Tuple[Optional[str], Optional[str]]:
-    """Sehr einfacher BLS-Fallback über SQLite.
+) -> Tuple[Optional[str], Optional[str], Optional[str]]:
+    """BLS-Matcher über SQLite.
 
-    Idee:
     - Wir suchen Kandidaten über LIKE %token%
     - Dann ranken wir Kandidaten danach, wie viele Tokens matchen
 
     Rückgabe:
-    - (best_id, best_name)
+    - (best_code, best_name, best_id)
     """
 
-    t, name_col, id_col = detect_table_and_columns(conn)
+    t, name_col, id_col, code_col = detect_table_and_columns(conn)
     if not t or not name_col:
-        return None, None
+        return None, None, None
 
     tokens = tokenize(query_text)
     if not tokens:
-        return None, None
+        return None, None, None
 
     # Kandidaten holen: OR-LIKE über Tokens
     where_parts: List[str] = []
@@ -506,20 +283,27 @@ def bls_best_match(
         params.append(f"%{tok}%")
 
     where_sql = " OR ".join(where_parts)
-    sql = (
-        f"SELECT {name_col}{',' + id_col if id_col else ''} "
-        f"FROM {t} WHERE {where_sql} LIMIT {limit}"
-    )
+    select_cols = [name_col]
+    if code_col:
+        select_cols.append(code_col)
+    if id_col:
+        select_cols.append(id_col)
+    sql = f"SELECT {', '.join(select_cols)} FROM {t} WHERE {where_sql} LIMIT {limit}"
 
     cur = conn.cursor()
     rows = cur.execute(sql, params).fetchall()
 
-    # best = (id, name, hits)
-    best: Tuple[Optional[str], Optional[str], int] = (None, None, -1)
+    # best = (code, name, id, hits)
+    best: Tuple[Optional[str], Optional[str], Optional[str], int] = (None, None, None, -1)
 
     for row in rows:
         name = row[0]
-        rid = row[1] if id_col else None
+        code = row[1] if code_col and len(row) > 1 else None
+        rid = None
+        if code_col and id_col and len(row) > 2:
+            rid = row[2]
+        elif id_col and len(row) > 1 and not code_col:
+            rid = row[1]
 
         hits = 0
         name_norm = normalize_text(str(name))
@@ -533,10 +317,10 @@ def bls_best_match(
             ):
                 hits += 1
 
-        if hits > best[2]:
-            best = (rid, str(name), hits)
+        if hits > best[3]:
+            best = (code, str(name), rid, hits)
 
-    return best[0], best[1]
+    return best[0], best[1], best[2]
 
 
 # -----------------------------
@@ -545,96 +329,65 @@ def bls_best_match(
 
 def enrich_plan(
     plan: dict,
-    group_keywords: Dict[str, List[str]],
-    tag_keywords: Dict[str, List[str]],
     bls_db_path: Optional[Path] = None,
+    code_letter_map: Optional[Dict[str, List[str]]] = None,
 ) -> Tuple[dict, dict]:
-    """Enriched den gesamten Plan.
+    """Enriched den gesamten Plan per BLS-Code-Letter-Mapping."""
 
-     Für jedes Item:
-     1) Keyword-Matching über raw_text
-     2) optional: BLS-Fallback, falls keine Gruppe gefunden wurde
-     3) Ergebnis wird geschrieben:
-         - `item.food_groups` (Liste): Automatisch erkannte Lebensmittelgruppe(n)
-         - `item.links.food_group` (String): Backward-Kompatibilität (erste Gruppe)
-         - `item.links.confidence` (Float): Vertrauensmaß für das primäre Match (0.0–1.0)
-         - `item.tags` (Liste): Tags (Rohkost, Vollkorn, Kartoffelerzeugnis, etc.)
+    stats = {"total_items": 0, "mapped_groups": 0, "mapped_via_bls": 0, "still_unmapped": 0}
+    code_letter_map = code_letter_map or {}
 
-    Hinweis: Benutzermanuelle Korrektionen im Frontend können `food_groups` 
-    zu mehreren Werten erweitern — diese werden dann bei der Evaluation berücksichtigt.
-
-    Rückgabe:
-    - (enriched_plan, stats)
-    """
-
-    stats = {
-        "total_items": 0,
-        "mapped_groups": 0,
-        "unmapped_before_bls": 0,
-        "mapped_via_bls": 0,
-        "still_unmapped": 0,
-    }
-
-    # Optional DB-Verbindung
     conn: Optional[sqlite3.Connection] = None
     if bls_db_path:
         if bls_db_path.exists():
             conn = sqlite3.connect(str(bls_db_path))
         else:
-            print(f"BLS DB nicht gefunden: {bls_db_path} (Fallback deaktiviert)")
+            print(f"BLS DB nicht gefunden: {bls_db_path}")
 
     for day in plan.get("days", []):
         for menu in day.get("menus", []):
             for item in menu.get("items", []):
                 stats["total_items"] += 1
-                raw = item.get("raw_text", "") or ""
 
-                # 1) normaler Keyword-Match
-                group_matches = pick_matching_groups(raw, group_keywords)
-                group_res = group_matches[0] if group_matches else MatchResult(None, 0.0, 0)
-                tags = collect_tags(raw, tag_keywords)
-                tags = sorted(set(tags + collect_note_tags(item.get("notes") or [])))
+                raw_text = item.get("raw_text", "") or ""
+                tags = sorted(set(collect_note_tags(item.get("notes") or [])))
 
-                # 2) optional BLS-Fallback, wenn keine Gruppe gefunden
-                used_bls = False
-                bls_id = None
-                bls_name = None
+                groups: List[str] = []
+                bls_matches = []
 
-                if not group_res.key:
-                    stats["unmapped_before_bls"] += 1
-                    if conn:
-                        bls_id, bls_name = bls_best_match(conn, raw)
-                        if bls_name:
-                            # Versuch nochmal über BLS-Name zu mappen
-                            group_matches = pick_matching_groups(bls_name, group_keywords)
-                            group_res = group_matches[0] if group_matches else MatchResult(None, 0.0, 0)
-                            tags = sorted(
-                                set(tags + collect_tags(bls_name, tag_keywords))
-                            )
-                            used_bls = True
+                if conn:
+                    bls_matches = find_bls_matches_for_text(conn, raw_text)
+                    for bls_code, bls_name, bls_id in bls_matches:
+                        if not bls_code:
+                            continue
+                        code = str(bls_code).strip()
+                        if not code:
+                            continue
+                        letter = code[0].upper()
+                        mapped_groups = code_letter_map.get(letter, [])
+                        for group in mapped_groups:
+                            if group not in groups:
+                                groups.append(group)
 
-                # 3) writeback: Ergebnisse ins Item schreiben
                 links = item.get("links") or {}
-                
-                # Multi-Gruppen-Struktur: alle passenden Gruppen als Liste
-                item["food_groups"] = [match.key for match in group_matches if match.key]
-                
-                # Für Backward-Kompatibilität: auch Single-Group setzen
-                links["food_group"] = item["food_groups"][0] if item["food_groups"] else None
-                links["confidence"] = group_res.score
+                links["food_group"] = groups[0] if groups else None
+                links["confidence"] = 1.0 if groups else 0.0
+                if bls_matches:
+                    first_code, first_name, first_id = bls_matches[0]
+                    links["bls_id"] = first_id
+                    links["bls_name"] = first_name
+                    links["bls_matches"] = [
+                        {"code": code, "name": name, "id": rid}
+                        for code, name, rid in bls_matches
+                    ]
 
-                # Falls BLS benutzt wurde, behalten wir Debug-Infos
-                if used_bls:
-                    links["bls_id"] = bls_id
-                    links["bls_name"] = bls_name
-
+                item["food_groups"] = groups
                 item["links"] = links
                 item["tags"] = sorted(set((item.get("tags") or []) + tags))
 
-                if group_res.key:
+                if groups:
                     stats["mapped_groups"] += 1
-                    if used_bls:
-                        stats["mapped_via_bls"] += 1
+                    stats["mapped_via_bls"] += 1
                 else:
                     stats["still_unmapped"] += 1
 
@@ -654,28 +407,25 @@ def main():
         "--mapping-json",
         dest="mapping_json",
         required=True,
-        help="bls_to_dge_groups.json für Keywords und Tags",
+        help="bls_to_dge_groups.json mit code_letter_mapping",
     )
     ap.add_argument(
         "--bls-db",
         dest="blsdb",
-        required=False,
-        help="Optional: Pfad zur SQLite BLS DB (Fallback), z.B. instance/bls.db",
+        required=True,
+        help="Pfad zur SQLite BLS DB (erforderlich für BLS-only mapping), z.B. instance/bls.db",
     )
     args = ap.parse_args()
 
     inp = Path(args.inp)
     out = Path(args.out)
 
-    # Input-Plan laden
     plan = json.loads(inp.read_text(encoding="utf-8"))
 
-    # Keywords aus JSON laden
-    group_keywords, tag_keywords = load_json_mapping(Path(args.mapping_json))
+    code_letter_map = load_code_letter_mapping(Path(args.mapping_json))
 
-    # enrichment durchführen
-    bls_db_path = Path(args.blsdb) if args.blsdb else None
-    enriched, stats = enrich_plan(plan, group_keywords, tag_keywords, bls_db_path)
+    bls_db_path = Path(args.blsdb)
+    enriched, stats = enrich_plan(plan, bls_db_path=bls_db_path, code_letter_map=code_letter_map)
 
     # Output schreiben
     out.parent.mkdir(parents=True, exist_ok=True)

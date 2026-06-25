@@ -55,7 +55,6 @@ def test_preview_route_returns_enriched_plan(monkeypatch, client):
         return plan_doc, {"total_items": 1, "mapped_groups": 1}
 
     monkeypatch.setattr("scripts.parse_foodplan.parse_foodplan", fake_parse_foodplan)
-    monkeypatch.setattr("scripts.enrich_foodplan.load_json_mapping", lambda _path: ({}, {}))
     monkeypatch.setattr("scripts.enrich_foodplan.enrich_plan", fake_enrich_plan)
 
     response = client.post(
