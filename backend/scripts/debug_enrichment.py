@@ -170,6 +170,8 @@ def debug_enrichment(
     phrases = split_candidate_phrases(raw_text)
     all_groups = []
     all_group_scores = {}
+    x_code_match_count = 0
+    y_code_match_count = 0
     
     for phrase_num, phrase in enumerate(phrases, 1):
         logger.log(f"\n--- PHRASE {phrase_num}: '{phrase}' ---")
@@ -195,6 +197,10 @@ def debug_enrichment(
             
             letter = code[0].upper()
             mapped_groups = code_letter_map.get(letter, [])
+            if letter == "X":
+                x_code_match_count += 1
+            elif letter == "Y":
+                y_code_match_count += 1
             
             logger.log(f"BLS-Code: {code} ('{bls_name}', score={score})")
             logger.push()
@@ -242,6 +248,12 @@ def debug_enrichment(
     
     logger.section("5. FINALES ERGEBNIS (PRO-PHRASE)")
     logger.log(f"Total Group Scores (aggregiert): {all_group_scores}")
+    logger.log(f"BLS-Match-Treffer mit X-Code: {x_code_match_count}", "WARNING" if x_code_match_count else "INFO")
+    logger.log(f"BLS-Match-Treffer mit Y-Code: {y_code_match_count}", "WARNING" if y_code_match_count else "INFO")
+    logger.log(
+        f"BLS-Match-Treffer mit X+Y-Code gesamt: {x_code_match_count + y_code_match_count}",
+        "WARNING" if (x_code_match_count + y_code_match_count) else "INFO",
+    )
     logger.log(f"Finales Ergebnis: {all_groups}", "SUCCESS" if all_groups else "ERROR")
     
     if all_groups:
@@ -250,10 +262,10 @@ def debug_enrichment(
         confidence = (top_score / total_score) if total_score else 0.0
         logger.log(f"Confidence (Top-Score/Total): {top_score}/{total_score} = {confidence:.2%}")
         
-        return all_groups, confidence
+        return all_groups, confidence, x_code_match_count, y_code_match_count
     else:
         logger.log("❌ Keine Gruppen gefunden", "ERROR")
-        return [], 0.0
+        return [], 0.0, x_code_match_count, y_code_match_count
 
 
 def debug_foodplan_item(
@@ -292,12 +304,20 @@ def debug_foodplan_item(
         debug_bls_matches(logger, conn, raw_text)
         
         # Step 4: Enrichment
-        groups, confidence = debug_enrichment(logger, conn, raw_text, code_letter_map)
+        groups, confidence, x_code_match_count, y_code_match_count = debug_enrichment(
+            logger,
+            conn,
+            raw_text,
+            code_letter_map,
+        )
         
         logger.section("ZUSAMMENFASSUNG")
         logger.log(f"Food Groups: {groups}", "SUCCESS")
         logger.log(f"Primary Group: {groups[0] if groups else 'NONE'}", "SUCCESS" if groups else "ERROR")
         logger.log(f"Confidence: {confidence:.2%}", "SUCCESS")
+        logger.log(f"BLS-Match-Treffer mit X-Code: {x_code_match_count}", "WARNING" if x_code_match_count else "INFO")
+        logger.log(f"BLS-Match-Treffer mit Y-Code: {y_code_match_count}", "WARNING" if y_code_match_count else "INFO")
+        logger.log(f"BLS-Match-Treffer mit X+Y-Code gesamt: {x_code_match_count + y_code_match_count}", "WARNING" if (x_code_match_count + y_code_match_count) else "INFO")
     
     finally:
         conn.close()
