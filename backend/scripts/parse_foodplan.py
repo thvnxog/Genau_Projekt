@@ -184,6 +184,14 @@ def parse_block(block_df: pd.DataFrame, name_col: int, amount_col: int, notes_co
             continue
 
         # neuer Eintrag
+        # Wenn der vorherige Eintrag mit einem Bindestrich endet, behandeln
+        # wir die aktuelle `name`-Zeile als Fortsetzung (z.B. Zeilenumbruch mit "-").
+        if name and current and isinstance(current.get("raw_text"), str) and current["raw_text"].rstrip().endswith("-"):
+            current["raw_text"] = join_hyphen(current["raw_text"], name)
+            if notes:
+                current["notes"].append(notes)
+            continue
+
         if name:
             if current:
                 items.append(current)

@@ -75,7 +75,12 @@ export type AnalyzeResponse = ReportDual | ReportMonthlyDual;
 // Strukturen für den editierbaren Plan im Selbstcheck.
 export type PlanItem = {
   raw_text?: string;
-  links?: { food_group?: string | null };
+  links?: {
+    food_group?: string | null;
+    confidence?: number | null;
+    bls_code_letter?: string | null;
+    bls_code_letters?: string[];
+  };
   tags?: string[];
   food_groups?: string[];
   notes?: string[];

@@ -400,7 +400,7 @@ def find_bls_matches_for_text(
 PHRASE_MAX_CANDIDATE_GROUPS = 3
 PHRASE_MIN_DOMINANCE = 0.5
 EXACT_MATCH_BONUS = 40
-CONTAINED_MATCH_BONUS = 10
+CONTAINED_MATCH_BONUS = 15
 
 
 def rank_phrase_groups(
@@ -719,6 +719,14 @@ def enrich_plan(
                     first_code, first_name, first_id, _first_score = all_bls_matches[0]
                     links["bls_id"] = first_id
                     links["bls_name"] = first_name
+                    links["bls_code_letter"] = str(first_code).strip().upper()[:1] if first_code else None
+                    links["bls_code_letters"] = sorted(
+                        {
+                            str(code).strip().upper()[:1]
+                            for code, _name, _rid, _score in all_bls_matches
+                            if code
+                        }
+                    )
                     links["bls_matches"] = [
                         {"code": code, "name": name, "id": rid, "score": score}
                         for code, name, rid, score in all_bls_matches

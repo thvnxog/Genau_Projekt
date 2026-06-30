@@ -59,3 +59,111 @@ test('selfcheck section exposes group chips and update action', () => {
   expect(toggleItemTag).not.toHaveBeenCalled();
   expect(onAnalyze).toHaveBeenCalled();
 });
+
+test('selfcheck section warns when a recognized item comes from X or Y', () => {
+  render(
+    <SelfCheckSection
+      draftItemCount={1}
+      selfCheckWeeks={[{ week_index: 0, week_label: 'Woche 1' }]}
+      missingFoodGroupByWeek={new Map([[0, 0]])}
+      normalizedSelfCheckWeekIndex={0}
+      setSelfCheckWeekIndex={vi.fn()}
+      selfCheckDays={[
+        {
+          day: {
+            weekday: 'Dienstag',
+            week_index: 0,
+            week_label: 'Woche 1',
+            menus: [
+              {
+                menu_type: 'mischkost',
+                items: [
+                  {
+                    raw_text: 'Zucchini',
+                    links: {
+                      food_group: 'vegetables',
+                      bls_code_letters: ['X'],
+                    },
+                    food_groups: ['vegetables'],
+                    tags: [] as string[],
+                  },
+                ],
+              },
+            ],
+          },
+          dayIdx: 0,
+        },
+      ]}
+      openMenus={{ '0-0': true }}
+      setOpenMenus={vi.fn()}
+      toggleItemFoodGroup={vi.fn()}
+      toggleItemTag={vi.fn()}
+      loading={false}
+      onBackToReport={vi.fn()}
+      onAnalyze={vi.fn()}
+    />,
+  );
+
+  expect(
+    screen.getByLabelText(/Diese Gruppe stammt aus einem X\/Y-BLS-Code/i),
+  ).toBeInTheDocument();
+});
+
+test('selfcheck section marks menu as special when majority comes from X or Y', () => {
+  render(
+    <SelfCheckSection
+      draftItemCount={2}
+      selfCheckWeeks={[{ week_index: 0, week_label: 'Woche 1' }]}
+      missingFoodGroupByWeek={new Map([[0, 0]])}
+      normalizedSelfCheckWeekIndex={0}
+      setSelfCheckWeekIndex={vi.fn()}
+      selfCheckDays={[
+        {
+          day: {
+            weekday: 'Mittwoch',
+            week_index: 0,
+            week_label: 'Woche 1',
+            menus: [
+              {
+                menu_type: 'mischkost',
+                items: [
+                  {
+                    raw_text: 'Zucchini',
+                    links: {
+                      food_group: 'vegetables',
+                      bls_code_letters: ['X'],
+                    },
+                    food_groups: ['vegetables'],
+                    tags: [],
+                  },
+                  {
+                    raw_text: 'Tomate',
+                    links: {
+                      food_group: 'vegetables',
+                      bls_code_letters: ['X'],
+                    },
+                    food_groups: ['vegetables'],
+                    tags: [],
+                  },
+                ],
+              },
+            ],
+          },
+          dayIdx: 0,
+        },
+      ]}
+      openMenus={{ '0-0': false }}
+      setOpenMenus={vi.fn()}
+      toggleItemFoodGroup={vi.fn()}
+      toggleItemTag={vi.fn()}
+      loading={false}
+      onBackToReport={vi.fn()}
+      onAnalyze={vi.fn()}
+    />,
+  );
+
+  expect(screen.getByText(/🔶 Sondermenü/)).toBeInTheDocument();
+  expect(
+    screen.getByLabelText(/2\/2 Gerichte stammen aus X\/Y-BLS-Codes/i),
+  ).toBeInTheDocument();
+});

@@ -14,6 +14,8 @@ import {
 } from '../../lib/foodplan';
 
 // Selbstcheck-UI: Zuordnungen prüfen, korrigieren und erneut auswerten.
+const SELF_CHECK_WARNING_SOURCE_LETTERS = new Set(['X', 'Y']);
+
 type SelfCheckWeek = {
   week_index: number;
   week_label: string;
@@ -129,6 +131,30 @@ export function SelfCheckSection({
                     !(it.tags ?? []).includes('not_applicable'),
                 ).length;
 
+                // Aggregiere X/Y-Herkunften auf Menü-Ebene
+                const allItems = menu.items ?? [];
+                const recognizedItems = allItems.filter(
+                  (it) =>
+                    Boolean(it.links?.food_group) ||
+                    (it.tags ?? []).includes('not_applicable'),
+                );
+                const itemsWithXYOrigin = recognizedItems.filter((it) => {
+                  const sourceLetters = Array.isArray(
+                    it.links?.bls_code_letters,
+                  )
+                    ? it.links.bls_code_letters
+                    : [];
+                  return sourceLetters.some((letter) =>
+                    SELF_CHECK_WARNING_SOURCE_LETTERS.has(
+                      String(letter).trim().toUpperCase(),
+                    ),
+                  );
+                });
+
+                const hasXYMajority =
+                  recognizedItems.length > 0 &&
+                  itemsWithXYOrigin.length / recognizedItems.length > 0.5;
+
                 const menuKey = `${dayIdx}-${menuIdx}`;
                 const isMenuOpen = openMenus[menuKey] ?? false;
 
@@ -161,16 +187,24 @@ export function SelfCheckSection({
                   >
                     <summary className='cursor-pointer select-none rounded text-sm font-extrabold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600 focus-visible:ring-offset-2'>
                       Menü: {menu.menu_type}{' '}
-                      {missingCount > 0 ? (
+                      {hasXYMajority && (
+                        <span
+                          className='ml-2 rounded-full bg-orange-100 px-2 py-0.5 text-xs font-black text-orange-800 border border-orange-200'
+                          title={`${itemsWithXYOrigin.length}/${recognizedItems.length} Gerichte stammen aus X/Y-BLS-Codes – Sondermenü, bitte prüfen.`}
+                          aria-label={`${itemsWithXYOrigin.length}/${recognizedItems.length} Gerichte stammen aus X/Y-BLS-Codes – Sondermenü, bitte prüfen.`}
+                        >
+                          Zur Prüfung empfohlen 👁️
+                        </span>
+                      )}
+                      {!hasXYMajority && missingCount > 0 && (
                         <span className='ml-2 rounded-full border border-slate-200 bg-white px-2 py-0.5 text-xs font-black text-slate-700'>
                           ⚠️ {missingCount} ohne Gruppe
                         </span>
-                      ) : (
-                        recognizedGroupsLabel && (
-                          <span className='ml-2 text-xs font-bold text-slate-700'>
-                            Erkannt: {recognizedGroupsLabel}
-                          </span>
-                        )
+                      )}
+                      {!hasXYMajority && missingCount === 0 && recognizedGroupsLabel && (
+                        <span className='ml-2 text-xs font-bold text-slate-700'>
+                          Erkannt: {recognizedGroupsLabel}
+                        </span>
                       )}
                     </summary>
 
@@ -190,6 +224,18 @@ export function SelfCheckSection({
                           const recognizedGroup =
                             Boolean(it.links?.food_group) || isNotApplicable;
                           const showGroups = showAllForMenu || !recognizedGroup;
+                          const sourceLetters = Array.isArray(
+                            it.links?.bls_code_letters,
+                          )
+                            ? it.links.bls_code_letters
+                            : [];
+                          const needsSourceLetterReview =
+                            recognizedGroup &&
+                            sourceLetters.some((letter) =>
+                              SELF_CHECK_WARNING_SOURCE_LETTERS.has(
+                                String(letter).trim().toUpperCase(),
+                              ),
+                            );
 
                           if (!showGroups) return null;
 
@@ -201,6 +247,15 @@ export function SelfCheckSection({
                               <summary className='cursor-pointer select-none rounded p-2.5 text-sm font-bold flex items-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600 focus-visible:ring-offset-2'>
                                 <span>{recognizedGroup ? '✓' : '⚠️'}</span>
                                 {it.raw_text}
+                                {recognizedGroup && needsSourceLetterReview && (
+                                  <span
+                                    className='rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-black text-amber-800'
+                                    title='Diese Gruppe stammt aus einem X/Y-BLS-Code und sollte geprüft werden.'
+                                    aria-label='Diese Gruppe stammt aus einem X/Y-BLS-Code und sollte geprüft werden.'
+                                  >
+                                    Bitte prüfen ⚠️
+                                  </span>
+                                )}
                               </summary>
 
                               <div className='border-t border-slate-200 p-3 space-y-4'>

@@ -321,7 +321,6 @@ Der JSON-Report enthält zusätzlich:
 - `summary.per_week[*]`: Details pro Woche mit erkannten/nicht erkannten Items
 - `summary.per_week_summary`: Statistiken über alle Wochen hinweg
 
-
 ### Backend-Tests starten
 
 ### Einmalig installieren
