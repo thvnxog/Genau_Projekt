@@ -201,11 +201,13 @@ export function SelfCheckSection({
                           ⚠️ {missingCount} ohne Gruppe
                         </span>
                       )}
-                      {!hasXYMajority && missingCount === 0 && recognizedGroupsLabel && (
-                        <span className='ml-2 text-xs font-bold text-slate-700'>
-                          Erkannt: {recognizedGroupsLabel}
-                        </span>
-                      )}
+                      {!hasXYMajority &&
+                        missingCount === 0 &&
+                        recognizedGroupsLabel && (
+                          <span className='ml-2 text-xs font-bold text-slate-700'>
+                            Erkannt: {recognizedGroupsLabel}
+                          </span>
+                        )}
                     </summary>
 
                     <div className='mt-2 grid gap-2'>
