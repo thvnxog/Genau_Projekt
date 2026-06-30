@@ -658,7 +658,7 @@ def enrich_plan(
                 raw_text = item.get("raw_text", "") or ""
                 tags = sorted(set(collect_note_tags(item.get("notes") or [])))
 
-                # Neue Logik: Pro Phrase eine eigene Bewertung
+                # Pro Phrase eine eigene Bewertung
                 all_phrases_groups: List[str] = []  # Finales Ergebnis: alle Gruppen aus allen Phrasen
                 all_bls_matches = []  # Debug: alle Matches aggregiert
                 all_group_scores: Dict[str, int] = {}  # Debug: alle Scores aggregiert
