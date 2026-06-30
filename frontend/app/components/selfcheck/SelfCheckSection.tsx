@@ -62,6 +62,23 @@ export function SelfCheckSection({
   onBackToReport,
   onAnalyze,
 }: SelfCheckSectionProps) {
+  const [reviewedSourceItems, setReviewedSourceItems] = React.useState<Record<string, boolean>>({});
+  const [manuallyAssignedItems, setManuallyAssignedItems] = React.useState<Record<string, boolean>>({});
+
+  const markSourceItemReviewed = (itemKey: string) => {
+    setReviewedSourceItems((prev) => ({
+      ...prev,
+      [itemKey]: true,
+    }));
+  };
+
+  const markItemManuallyAssigned = (itemKey: string) => {
+    setManuallyAssignedItems((prev) => ({
+      ...prev,
+      [itemKey]: true,
+    }));
+  };
+
   return (
     <section className='grid gap-4.5 text-left'>
       {/* Kopfbereich mit Kontext und Wochenauswahl (bei Monatsplänen). */}
@@ -125,6 +142,7 @@ export function SelfCheckSection({
 
             <div className='mt-2 grid gap-3'>
               {(day.menus ?? []).map((menu, menuIdx) => {
+                const menuKey = `${dayIdx}-${menuIdx}`;
                 const missingCount = (menu.items ?? []).filter(
                   (it) =>
                     !it.links?.food_group &&
@@ -151,11 +169,25 @@ export function SelfCheckSection({
                   );
                 });
 
-                const hasXYMajority =
-                  recognizedItems.length > 0 &&
-                  itemsWithXYOrigin.length / recognizedItems.length > 0.5;
+                const openXYReviewCount = recognizedItems.filter((it, itemIdx) => {
+                  const sourceLetters = Array.isArray(
+                    it.links?.bls_code_letters,
+                  )
+                    ? it.links.bls_code_letters
+                    : [];
+                  const itemKey = `${menuKey}-${itemIdx}`;
+                  return (
+                    sourceLetters.some((letter) =>
+                      SELF_CHECK_WARNING_SOURCE_LETTERS.has(
+                        String(letter).trim().toUpperCase(),
+                      ),
+                    ) &&
+                    !reviewedSourceItems[itemKey] &&
+                    !manuallyAssignedItems[itemKey]
+                  );
+                }).length;
 
-                const menuKey = `${dayIdx}-${menuIdx}`;
+                const hasOpenXYReview = openXYReviewCount > 0;
                 const isMenuOpen = openMenus[menuKey] ?? false;
 
                 const recognizedGroups = Array.from(
@@ -187,21 +219,22 @@ export function SelfCheckSection({
                   >
                     <summary className='cursor-pointer select-none rounded text-sm font-extrabold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600 focus-visible:ring-offset-2'>
                       Menü: {menu.menu_type}{' '}
-                      {hasXYMajority && (
+                      {hasOpenXYReview && (
                         <span
-                          className='ml-2 rounded-full bg-orange-100 px-2 py-0.5 text-xs font-black text-orange-800 border border-orange-200'
-                          title={`${itemsWithXYOrigin.length}/${recognizedItems.length} Gerichte stammen aus X/Y-BLS-Codes – Sondermenü, bitte prüfen.`}
-                          aria-label={`${itemsWithXYOrigin.length}/${recognizedItems.length} Gerichte stammen aus X/Y-BLS-Codes – Sondermenü, bitte prüfen.`}
+                          className='ml-2 rounded-full border border-slate-200 bg-white px-2 py-0.5 text-xs font-black text-slate-700'
+                          title={`${openXYReviewCount}/${itemsWithXYOrigin.length} Gerichte mit X/Y-BLS-Code sind noch offen.`}
+                          aria-label={`${openXYReviewCount}/${itemsWithXYOrigin.length} Gerichte mit X/Y-BLS-Code sind noch offen.`}
                         >
                           Zur Prüfung empfohlen 👁️
                         </span>
                       )}
-                      {!hasXYMajority && missingCount > 0 && (
+                      {missingCount > 0 && (
                         <span className='ml-2 rounded-full border border-slate-200 bg-white px-2 py-0.5 text-xs font-black text-slate-700'>
-                          ⚠️ {missingCount} ohne Gruppe
+                          {missingCount} Gericht
+                          {missingCount === 1 ? '' : 'e'} ohne Zuordnung ⚠️
                         </span>
                       )}
-                      {!hasXYMajority &&
+                      {!hasOpenXYReview &&
                         missingCount === 0 &&
                         recognizedGroupsLabel && (
                           <span className='ml-2 text-xs font-bold text-slate-700'>
@@ -220,12 +253,19 @@ export function SelfCheckSection({
                               !(it.tags ?? []).includes('not_applicable'),
                         )
                         .map(({ it, itemIdx }) => {
+                          const itemKey = `${menuKey}-${itemIdx}`;
                           const isNotApplicable = (it.tags ?? []).includes(
                             'not_applicable',
                           );
+                          const hadNoAssignedGroupInitially =
+                            !(it.links?.food_group) &&
+                            !(it.food_groups ?? []).length;
                           const recognizedGroup =
                             Boolean(it.links?.food_group) || isNotApplicable;
                           const showGroups = showAllForMenu || !recognizedGroup;
+                          const wasManuallyAssigned = Boolean(
+                            manuallyAssignedItems[itemKey],
+                          );
                           const sourceLetters = Array.isArray(
                             it.links?.bls_code_letters,
                           )
@@ -233,11 +273,24 @@ export function SelfCheckSection({
                             : [];
                           const needsSourceLetterReview =
                             recognizedGroup &&
+                            !wasManuallyAssigned &&
                             sourceLetters.some((letter) =>
                               SELF_CHECK_WARNING_SOURCE_LETTERS.has(
                                 String(letter).trim().toUpperCase(),
                               ),
                             );
+                          const isSourceItemReviewed = Boolean(
+                            reviewedSourceItems[itemKey],
+                          );
+                          const canMarkAsReviewed =
+                            recognizedGroup &&
+                            !wasManuallyAssigned &&
+                            sourceLetters.some((letter) =>
+                              SELF_CHECK_WARNING_SOURCE_LETTERS.has(
+                                String(letter).trim().toUpperCase(),
+                              ),
+                            ) &&
+                            !isSourceItemReviewed;
 
                           if (!showGroups) return null;
 
@@ -249,18 +302,51 @@ export function SelfCheckSection({
                               <summary className='cursor-pointer select-none rounded p-2.5 text-sm font-bold flex items-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600 focus-visible:ring-offset-2'>
                                 <span>{recognizedGroup ? '✓' : '⚠️'}</span>
                                 {it.raw_text}
-                                {recognizedGroup && needsSourceLetterReview && (
+                                {!recognizedGroup ? (
                                   <span
-                                    className='rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-black text-amber-800'
+                                    className='rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-black text-slate-700'
+                                    title='Kein Gericht gefunden. Bitte Zuordnung prüfen.'
+                                    aria-label='Kein Gericht gefunden. Bitte Zuordnung prüfen.'
+                                  >
+                                    Gericht ohne Zuordnung ⚠️
+                                  </span>
+                                ) : needsSourceLetterReview && !isSourceItemReviewed ? (
+                                  <span
+                                    className='rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-black text-slate-700'
                                     title='Diese Gruppe stammt aus einem X/Y-BLS-Code und sollte geprüft werden.'
                                     aria-label='Diese Gruppe stammt aus einem X/Y-BLS-Code und sollte geprüft werden.'
                                   >
-                                    Bitte prüfen ⚠️
+                                    Bitte prüfen 👁️
                                   </span>
-                                )}
+                                ) : recognizedGroup && isSourceItemReviewed ? (
+                                  <span className='rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-black text-emerald-700'>
+                                    Geprüft ✓
+                                  </span>
+                                ) : null}
                               </summary>
 
                               <div className='border-t border-slate-200 p-3 space-y-4'>
+                                {canMarkAsReviewed && (
+                                  <div className='flex justify-start'>
+                                    <button
+                                      type='button'
+                                      className='cursor-pointer rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-black text-slate-700 hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-600 focus-visible:ring-offset-2'
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        const hadNoAssignedGroup =
+                                          !(it.links?.food_group) &&
+                                          !(it.food_groups ?? []).length;
+                                        markSourceItemReviewed(itemKey);
+                                        if (hadNoAssignedGroup) {
+                                          markItemManuallyAssigned(itemKey);
+                                        }
+                                      }}
+                                    >
+                                      Geprüft
+                                    </button>
+                                  </div>
+                                )}
+
                                 <div>
                                   <div className='text-xs font-bold text-slate-700 mb-2'>
                                     Lebensmittelgruppen
@@ -311,6 +397,9 @@ export function SelfCheckSection({
                                           type='button'
                                           onClick={(e) => {
                                             e.stopPropagation();
+                                            if (hadNoAssignedGroupInitially) {
+                                              markItemManuallyAssigned(itemKey);
+                                            }
                                             toggleItemFoodGroup(
                                               dayIdx,
                                               menuIdx,
