@@ -224,6 +224,104 @@ Für die Tests verwenden wir aktuell zwei Werkzeuge:
 - `pytest` für das Backend
 - `vitest` für das Frontend
 
+## 8) Quantitative Evaluation
+
+Für die Auswertung der Erkennungsleistung gibt es ein separates Skript, das aus den
+BLS-Daten synthetische Wochenpläne erzeugt und das Enrichment automatisiert misst.
+
+### Was wird gemessen?
+
+- Gesamtzahl erkannter Gerichte
+- Erkennungsrate pro Woche
+- unzugeordnete Gerichte und deren Fehlerursachen
+- Mehrfachzuordnungen (Gerichte, die mehreren Gruppen zugeordnet wurden)
+
+### Struktur der synthetischen Daten
+
+- **Pro Tag:** 1 Menu mit genau 2 Gerichten
+- **Standard:** 1 Woche (5 Wochentage)
+- Beliebig erweiterbar auf mehrere Wochen mit `--weeks`
+
+### Standardlauf
+
+Im Backend-Verzeichnis ausführen:
+
+```sh
+cd backend
+.venv/bin/python scripts/quantitative_bls_eval.py --sample-size 10 --seed 42 --weeks 1 --stress-profile none
+```
+
+### Wichtige Optionen
+
+- `--sample-size 0`: alle BLS-Gerichte testen
+- `--weeks 4`: mehrere Wochen simulieren
+- `--show-weeks`: Zeige detaillierte Wochen-Ergebnisse (Standard: deaktiviert)
+- `--stress-profile noisy`: absichtlich schwierigere Texte erzeugen
+  - `none` (Standard): unveränderte BLS-Namen
+  - `noisy`: Zusätze wie "frisch", "hausgemacht" hinzufügen
+  - `long`: längere, zusammengesetzte Beschreibungen
+  - `duplicate`: Namen mehrfach/mit Trennzeichen
+  - `ambiguous`: Kombinationen mehrerer Gerichtsnamen
+- `--report-out /tmp/report.json`: JSON-Report speichern
+
+### Beispiele
+
+Schneller Test mit 10 Gerichten:
+
+```sh
+cd backend
+.venv/bin/python scripts/quantitative_bls_eval.py --sample-size 10 --seed 42
+```
+
+Test mit 100 Gerichten über 10 Wochen und detaillierten Wochen-Ergebnissen:
+
+```sh
+cd backend
+.venv/bin/python scripts/quantitative_bls_eval.py --sample-size 100 --seed 42 --weeks 10 --show-weeks
+```
+
+**Alle 7.140 BLS-Gerichte testen** (ca. 1-2 Minuten, automatisch verteilt auf ~143 Wochen):
+
+```sh
+cd backend
+.venv/bin/python scripts/quantitative_bls_eval.py --sample-size 0 --seed 42 --stress-profile none --report-out /tmp/all_bls_results.json
+```
+
+Stress-Test mit schwierigeren Texten (ambig) und Wochen-Details:
+
+```sh
+cd backend
+.venv/bin/python scripts/quantitative_bls_eval.py --sample-size 50 --seed 7 --weeks 2 --stress-profile ambiguous --show-weeks
+```
+
+JSON-Report schreiben:
+
+```sh
+cd backend
+.venv/bin/python scripts/quantitative_bls_eval.py --sample-size 100 --seed 42 --report-out /tmp/quant_eval_report.json
+```
+
+### Ausgabe interpretieren
+
+Die Konsole zeigt:
+
+- **Gesamtgerichte**: Anzahl getesteter Items
+- **Erkannt**: Anzahl erfolgreich zugeordneter Items (%)
+- **Über BLS-Code erkannt**: Erfolgreiche BLS-Treffer (%)
+- **Unverändert unzugeordnet**: Items ohne Zuordnung (%)
+- **Mehrfach zugeordnete**: Items, die mehreren Gruppen zugeordnet wurden (%)
+- **Hauptgründe für Nicht-Erkennung**: Fehlerklassifikation mit Beispiel-Items
+- **Top Primärgruppen**: Häufigste erkannte Lebensmittelgruppen
+- **Wochen-Details** (mit `--show-weeks`): Pro Woche erkannte und nicht erkannte Items
+
+Der JSON-Report enthält zusätzlich:
+
+- `summary.group_distribution`: Verteilung der erkannten Primärgruppen
+- `summary.unmapped_reason_counts`: Gründe für nicht erkannte Items
+- `summary.per_week[*]`: Details pro Woche mit erkannten/nicht erkannten Items
+- `summary.per_week_summary`: Statistiken über alle Wochen hinweg
+
+
 ### Backend-Tests starten
 
 ### Einmalig installieren
