@@ -399,7 +399,7 @@ def find_bls_matches_for_text(
 
 PHRASE_MAX_CANDIDATE_GROUPS = 3
 PHRASE_MIN_DOMINANCE = 0.5
-EXACT_MATCH_BONUS = 20
+EXACT_MATCH_BONUS = 40
 CONTAINED_MATCH_BONUS = 10
 
 
@@ -427,13 +427,15 @@ def rank_phrase_groups(
     return best_groups, max_score, total_score
 
 
-def phrase_is_too_ambiguous(group_count: int, max_score: int, total_score: int) -> bool:
+def phrase_is_too_ambiguous(group_count: int, max_score: int, total_score: int, group_scores: Optional[Dict[str, int]] = None) -> bool:
     """Prüft, ob eine Phrase zu viele plausible Gruppen hat.
 
-    Nur blockieren wenn:
-    - Extrem viele Gruppen (> 5), ODER
-    - Schwache Dominanz (<= 50%), ODER
-    - Mehrere Gruppen (> 3) UND keine klare Mehrheit (< 55%)
+    Blockieren wenn:
+    1. Extrem viele Gruppen (> 5), ODER
+    2. Sehr schwache Dominanz (< 45%), ODER
+    3. Perfekte 50/50 Ambiguität (dominance == 0.5), ODER
+    4. Mehrere Gruppen (> 3) UND schwache Dominanz (0.45 <= dom < 0.55) UND
+       der Gewinner nicht deutlich gegen seinen Konkurrenten führt (ratio < 1.2)
     """
 
     if not total_score:
@@ -441,17 +443,32 @@ def phrase_is_too_ambiguous(group_count: int, max_score: int, total_score: int) 
 
     dominance = max_score / total_score
 
-    # Extrem viele Gruppen → blockieren
+    # 1. Extrem viele Gruppen → blockieren
     if group_count > 5:
         return True
 
-    # Keine Dominanz → blockieren
-    if dominance <= 0.5:
+    # 2. Sehr schwache Dominanz → blockieren
+    if dominance < 0.45:
         return True
 
-    # Mehrere Gruppen + schwache Dominanz → blockieren
-    if group_count > PHRASE_MAX_CANDIDATE_GROUPS and dominance < 0.55:
+    # 3. Perfekte 50/50 → blockieren
+    if abs(dominance - 0.5) < 0.001:  # 0.5 ± tolerance
         return True
+
+    # 4. Mehrere Gruppen + schwache Dominanz → prüfe Winner vs 2. Platz
+    if group_count > PHRASE_MAX_CANDIDATE_GROUPS and 0.45 <= dominance < 0.55:
+        # Prüfe, ob der Gewinner gegen den 2. Platz deutlich führt
+        if group_scores:
+            sorted_scores = sorted(group_scores.values(), reverse=True)
+            if len(sorted_scores) >= 2:
+                max_vs_second = sorted_scores[0] / sorted_scores[1] if sorted_scores[1] > 0 else float('inf')
+                # Blockieren nur, wenn auch gegen 2. Platz der Vorsprung schwach ist (< 1.2x)
+                if max_vs_second < 1.2:
+                    return True
+            else:
+                return True
+        else:
+            return True
 
     return False
 
@@ -681,7 +698,7 @@ def enrich_plan(
                             phrase_group_first_seen,
                         )
                         if phrase_group_scores and phrase_is_too_ambiguous(
-                            len(phrase_group_scores), max_score, total_score
+                            len(phrase_group_scores), max_score, total_score, phrase_group_scores
                         ):
                             continue
 

@@ -223,7 +223,7 @@ def debug_enrichment(
             phrase_group_first_seen,
         )
         if phrase_group_scores and phrase_is_too_ambiguous(
-            len(phrase_group_scores), max_score, total_score
+            len(phrase_group_scores), max_score, total_score, phrase_group_scores
         ):
             logger.log(
                 f"\n⚠ Phrase zu mehrdeutig: {len(phrase_group_scores)} Gruppen, "
