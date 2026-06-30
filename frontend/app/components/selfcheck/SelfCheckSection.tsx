@@ -62,8 +62,12 @@ export function SelfCheckSection({
   onBackToReport,
   onAnalyze,
 }: SelfCheckSectionProps) {
-  const [reviewedSourceItems, setReviewedSourceItems] = React.useState<Record<string, boolean>>({});
-  const [manuallyAssignedItems, setManuallyAssignedItems] = React.useState<Record<string, boolean>>({});
+  const [reviewedSourceItems, setReviewedSourceItems] = React.useState<
+    Record<string, boolean>
+  >({});
+  const [manuallyAssignedItems, setManuallyAssignedItems] = React.useState<
+    Record<string, boolean>
+  >({});
 
   const markSourceItemReviewed = (itemKey: string) => {
     setReviewedSourceItems((prev) => ({
@@ -169,23 +173,25 @@ export function SelfCheckSection({
                   );
                 });
 
-                const openXYReviewCount = recognizedItems.filter((it, itemIdx) => {
-                  const sourceLetters = Array.isArray(
-                    it.links?.bls_code_letters,
-                  )
-                    ? it.links.bls_code_letters
-                    : [];
-                  const itemKey = `${menuKey}-${itemIdx}`;
-                  return (
-                    sourceLetters.some((letter) =>
-                      SELF_CHECK_WARNING_SOURCE_LETTERS.has(
-                        String(letter).trim().toUpperCase(),
-                      ),
-                    ) &&
-                    !reviewedSourceItems[itemKey] &&
-                    !manuallyAssignedItems[itemKey]
-                  );
-                }).length;
+                const openXYReviewCount = recognizedItems.filter(
+                  (it, itemIdx) => {
+                    const sourceLetters = Array.isArray(
+                      it.links?.bls_code_letters,
+                    )
+                      ? it.links.bls_code_letters
+                      : [];
+                    const itemKey = `${menuKey}-${itemIdx}`;
+                    return (
+                      sourceLetters.some((letter) =>
+                        SELF_CHECK_WARNING_SOURCE_LETTERS.has(
+                          String(letter).trim().toUpperCase(),
+                        ),
+                      ) &&
+                      !reviewedSourceItems[itemKey] &&
+                      !manuallyAssignedItems[itemKey]
+                    );
+                  },
+                ).length;
 
                 const hasOpenXYReview = openXYReviewCount > 0;
                 const isMenuOpen = openMenus[menuKey] ?? false;
@@ -258,7 +264,7 @@ export function SelfCheckSection({
                             'not_applicable',
                           );
                           const hadNoAssignedGroupInitially =
-                            !(it.links?.food_group) &&
+                            !it.links?.food_group &&
                             !(it.food_groups ?? []).length;
                           const recognizedGroup =
                             Boolean(it.links?.food_group) || isNotApplicable;
@@ -310,7 +316,8 @@ export function SelfCheckSection({
                                   >
                                     Gericht ohne Zuordnung ⚠️
                                   </span>
-                                ) : needsSourceLetterReview && !isSourceItemReviewed ? (
+                                ) : needsSourceLetterReview &&
+                                  !isSourceItemReviewed ? (
                                   <span
                                     className='rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-black text-slate-700'
                                     title='Diese Gruppe stammt aus einem X/Y-BLS-Code und sollte geprüft werden.'
@@ -334,7 +341,7 @@ export function SelfCheckSection({
                                       onClick={(e) => {
                                         e.stopPropagation();
                                         const hadNoAssignedGroup =
-                                          !(it.links?.food_group) &&
+                                          !it.links?.food_group &&
                                           !(it.food_groups ?? []).length;
                                         markSourceItemReviewed(itemKey);
                                         if (hadNoAssignedGroup) {
