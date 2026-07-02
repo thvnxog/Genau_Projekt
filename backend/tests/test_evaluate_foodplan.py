@@ -50,6 +50,17 @@ def test_infer_groups_for_item_prefers_multi_groups_and_deduplicates():
     assert infer_groups_for_item(item) == ["vegetables", "fish"]
 
 
+def test_infer_groups_for_item_ignores_tags_and_raw_text_without_explicit_groups():
+    item = {
+        "food_groups": [],
+        "links": {"food_group": None},
+        "tags": ["wholegrain", "raw_veg"],
+        "raw_text": "Kartoffel mit Salat",
+    }
+
+    assert infer_groups_for_item(item) == []
+
+
 def test_evaluate_plan_for_diet_counts_groups_and_builds_gram_hints():
     # Die Bewertung zählt Gruppen und erzeugt Gramm-Hinweise für Regel-Checks.
     plan = build_plan()

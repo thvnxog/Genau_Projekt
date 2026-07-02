@@ -234,49 +234,8 @@ def as_list(value):
 
     return value if isinstance(value, list) else [value]
 
-TAG_TO_GROUP_HINT = {
-    "raw_veg": "vegetables",
-    "wholegrain": "grains_potatoes",
-    "potato_product": "grains_potatoes",
-    "whole_fruit": "fruit",
-}
-
-RAW_TEXT_GROUP_HINTS = {
-    "grains_potatoes": [
-        "kartoffel",
-        "nudel",
-        "reis",
-        "brot",
-        "spätzle",
-        "spaetzle",
-        "gnocchi",
-        "couscous",
-        "polenta",
-    ],
-    "vegetables": [
-        "gemüse",
-        "gemuese",
-        "salat",
-        "brokkoli",
-        "karotte",
-        "karotten",
-        "tomate",
-        "spinat",
-        "zucchini",
-        "paprika",
-        "pilz",
-        "rohkost",
-    ],
-    "legumes": ["bohne", "bohnen", "linse", "linsen", "kichererbse", "erbsen"],
-    "fruit": ["apfel", "birne", "obst", "beeren", "banane", "orange", "mandarine"],
-    "dairy": ["milch", "joghurt", "quark", "käse", "kaese", "sahne"],
-    "meat": ["fleisch", "hähnchen", "haehnchen", "pute", "schwein", "rind", "wurst"],
-    "fish": ["fisch", "lachs", "seelachs", "forelle", "kabeljau", "thunfisch", "matjes"],
-}
-
-
 def infer_groups_for_item(item: dict) -> List[str]:
-    """Leitet eine grobe Gruppe für die Schätzung ab, wenn keine explizite Gruppe vorliegt."""
+    """Liefert nur explizit hinterlegte Lebensmittelgruppen eines Gerichts."""
 
     groups: List[str] = []
 
@@ -290,20 +249,6 @@ def infer_groups_for_item(item: dict) -> List[str]:
         for group in multi_groups:
             if isinstance(group, str) and group.strip():
                 groups.append(group.strip())
-
-    if groups:
-        return list(dict.fromkeys(groups))
-
-    tags = item.get("tags") or []
-    for tag in tags:
-        hint = TAG_TO_GROUP_HINT.get(tag)
-        if hint:
-            groups.append(hint)
-
-    raw_text = (item.get("raw_text") or "").lower()
-    for group, keywords in RAW_TEXT_GROUP_HINTS.items():
-        if any(keyword in raw_text for keyword in keywords):
-            groups.append(group)
 
     return list(dict.fromkeys(groups))
 
