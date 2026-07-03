@@ -33,6 +33,42 @@ from scripts.enrich_foodplan import (
     phrase_is_too_ambiguous,
     enrich_plan,
 )
+from scripts.quantitative_bls_eval import classify_unmapped_item
+
+
+UNMAPPED_REASON_LABELS = {
+    "empty_text": "Kein verwertbarer Eingabetext vorhanden.",
+    "too_short": "Der Text ist zu kurz fuer eine belastbare Zuordnung.",
+    "no_bls_match": "Es wurde kein passender BLS-Treffer gefunden.",
+    "no_bls_match_compound_text": "Es wurde kein passender BLS-Treffer fuer den zusammengesetzten Text gefunden.",
+    "ambiguous_or_blocked": "Es gab Treffer, aber die Gruppenlage war zu mehrdeutig und wurde deshalb blockiert.",
+    "mapping_missing_or_other": "Es gab einen BLS-Treffer, aber daraus entstand keine bewertbare DGE-Gruppe (fehlendes Mapping oder nur 'other').",
+    "unknown": "Es konnte kein eindeutiger Grund abgeleitet werden.",
+}
+
+
+def build_unmapped_debug_reason(raw_text: str, matches: list[tuple], group_scores: dict) -> tuple[str, str]:
+    """Leitet fuer die Debug-Ausgabe einen Grund fuer fehlende Gruppen ab."""
+
+    bls_matches = [
+        {"code": code, "name": name, "id": row_id, "score": score}
+        for code, name, row_id, score in matches
+    ]
+    first_bls_id = next((row_id for _code, _name, row_id, _score in matches if row_id), None)
+    reason = classify_unmapped_item(
+        {
+            "raw_text": raw_text,
+            "food_groups": [],
+            "links": {
+                "bls_matches": bls_matches,
+                "group_scores": group_scores,
+                "bls_id": first_bls_id,
+                "food_group": None,
+                "confidence": 0.0,
+            },
+        }
+    )
+    return reason, UNMAPPED_REASON_LABELS.get(reason, UNMAPPED_REASON_LABELS["unknown"])
 
 
 class DebugLogger:
@@ -170,6 +206,7 @@ def debug_enrichment(
     phrases = split_candidate_phrases(raw_text)
     all_groups = []
     all_group_scores = {}
+    all_matches = []
     x_code_match_count = 0
     y_code_match_count = 0
     
@@ -178,6 +215,7 @@ def debug_enrichment(
         logger.push()
         
         matches = find_bls_matches_for_text(conn, phrase)
+        all_matches.extend(matches)
         logger.log(f"Matches gefunden: {len(matches)}")
         
         phrase_group_scores = {}
@@ -265,6 +303,13 @@ def debug_enrichment(
         return all_groups, confidence, x_code_match_count, y_code_match_count
     else:
         logger.log("❌ Keine Gruppen gefunden", "ERROR")
+        reason_key, reason_label = build_unmapped_debug_reason(
+            raw_text,
+            all_matches,
+            all_group_scores,
+        )
+        logger.log(f"Grundschluessel: {reason_key}", "WARNING")
+        logger.log(f"Warum keine Gruppe gefunden wurde: {reason_label}", "WARNING")
         return [], 0.0, x_code_match_count, y_code_match_count
 
 
