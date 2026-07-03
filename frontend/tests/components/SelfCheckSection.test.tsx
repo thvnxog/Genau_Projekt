@@ -109,7 +109,7 @@ test('selfcheck section warns when a recognized item comes from X or Y', () => {
   ).toBeInTheDocument();
 });
 
-test('selfcheck section marks menu as special when majority comes from X or Y', () => {
+test('selfcheck section marks menu as recommended for review when X or Y items are open', () => {
   render(
     <SelfCheckSection
       draftItemCount={2}
@@ -162,8 +162,8 @@ test('selfcheck section marks menu as special when majority comes from X or Y', 
     />,
   );
 
-  expect(screen.getByText(/🔶 Sondermenü/)).toBeInTheDocument();
+  expect(screen.getByText(/Zur Prüfung empfohlen/i)).toBeInTheDocument();
   expect(
-    screen.getByLabelText(/2\/2 Gerichte stammen aus X\/Y-BLS-Codes/i),
+    screen.getByLabelText(/2\/2 Gerichte mit X\/Y-BLS-Code sind noch offen/i),
   ).toBeInTheDocument();
 });
