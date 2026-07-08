@@ -30,9 +30,15 @@ from flask import Flask, request, abort
 
 # .env laden: erlaubt lokale Konfiguration ohne Codeänderung (z.B. DATABASE_URL)
 from dotenv import load_dotenv
+from sqlalchemy import text
 
 # Unser SQLAlchemy-DB-Objekt und das Food-Model
-from models import db, Food
+try:
+    # Package import (e.g. `from backend.app import create_app`)
+    from .models import db, Food
+except ImportError:
+    # Script import (e.g. `python backend/app.py`)
+    from models import db, Food
 
 # .env laden (optional). Falls keine .env existiert, passiert nichts.
 load_dotenv()
@@ -71,16 +77,31 @@ def create_app():
 
     # --- Datenbank-Konfiguration -------------------------------------------------
     # SQLALCHEMY_DATABASE_URI gibt an, wo die Datenbank liegt.
-    # Default: sqlite:///bls.db
-    #   -> Bei Flask bedeutet das: die Datei liegt im instance-Ordner (z.B. backend/instance/bls.db).
-    #   -> Der instance-Ordner ist pro Installation/Umgebung gedacht.
+    # Default: backend/instance/bls.db (als absoluter Pfad), damit
+    # Paket-Import und Skript-Start dieselbe DB nutzen.
     # Per .env kann man das überschreiben:
     #   DATABASE_URL=sqlite:////absoluter/pfad/bls.db
     #   DATABASE_URL=postgresql://...
+    backend_dir = Path(__file__).resolve().parent
+    default_sqlite_path = (backend_dir / "instance" / "bls.db").resolve()
     app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv(
-        "DATABASE_URL", "sqlite:///bls.db"
+        "DATABASE_URL", f"sqlite:///{default_sqlite_path.as_posix()}"
     )
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+
+    def ensure_foods_code_column() -> None:
+        """Erweitert ältere SQLite-Schemata um `foods.code`, falls nötig.
+
+        Hintergrund: `db.create_all()` legt fehlende Tabellen an, migriert aber keine
+        bestehenden Spalten. Ältere DB-Dateien können daher ohne `foods.code` vorliegen.
+        """
+
+        rows = db.session.execute(text("PRAGMA table_info(foods)")).fetchall()
+        existing_columns = {row[1] for row in rows}
+        if "code" not in existing_columns:
+            db.session.execute(text("ALTER TABLE foods ADD COLUMN code VARCHAR(64)"))
+            db.session.commit()
+            logger.info("Schema angepasst: Spalte foods.code wurde ergänzt")
 
     # DB mit der App verbinden (Initialisierung von Flask-SQLAlchemy)
     db.init_app(app)
@@ -236,7 +257,10 @@ def create_app():
         data = f.read()
         bio = io.BytesIO(data)
 
-        from scripts.parse_foodplan import parse_foodplan
+        try:
+            from .scripts.parse_foodplan import parse_foodplan
+        except ImportError:
+            from scripts.parse_foodplan import parse_foodplan
 
         try:
             plan = parse_foodplan(bio)
@@ -254,10 +278,16 @@ def create_app():
                 ),
             )
 
-        from scripts.enrich_foodplan import (
-            load_code_letter_mapping,
-            enrich_plan,
-        )
+        try:
+            from .scripts.enrich_foodplan import (
+                load_code_letter_mapping,
+                enrich_plan,
+            )
+        except ImportError:
+            from scripts.enrich_foodplan import (
+                load_code_letter_mapping,
+                enrich_plan,
+            )
 
         base_dir = Path(__file__).resolve().parent  # backend/
         mapping_json = base_dir / "rules" / "bls_to_dge_groups.json"
@@ -445,7 +475,10 @@ def create_app():
 
         logger.debug("Loaded rules document from %s", rules_path)
 
-        from scripts.evaluate_foodplan import evaluate_plan_for_diet
+        try:
+            from .scripts.evaluate_foodplan import evaluate_plan_for_diet
+        except ImportError:
+            from scripts.evaluate_foodplan import evaluate_plan_for_diet
 
         def split_plan_into_week_plans(plan_doc: dict):
             """Gruppiert einen Plan in Teilpläne pro Woche (über day.week_index)."""
@@ -558,6 +591,7 @@ def create_app():
     with app.app_context():
         # Tabellen erstellen, falls noch nicht vorhanden.
         db.create_all()
+        ensure_foods_code_column()
 
     return app
 

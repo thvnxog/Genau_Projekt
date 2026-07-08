@@ -141,6 +141,41 @@ Der Server läuft dann lokal auf:
 
 - `http://127.0.0.1:5000`
 
+### Troubleshooting: `/foods` gibt leeres Ergebnis zurück
+
+Symptom:
+
+- `GET /health` funktioniert
+- `GET /foods?q=apfel&limit=10` liefert `{"items":[]}` trotz importierter BLS-Daten
+
+Typische Ursache:
+
+- Es laufen mehrere Backend-Prozesse parallel (z.B. durch Debug-ReLoader oder andere lokale Tools).
+- Die App wurde in unterschiedlichen Startmodi gestartet und hat dadurch früher unterschiedliche SQLite-Instanzen verwendet.
+
+Status im Projekt:
+
+- Die Standard-DB ist jetzt stabil auf `backend/instance/bls.db` gesetzt, damit Paket-Import und Skript-Start dieselbe Datenbank nutzen.
+
+Empfohlene Lösung:
+
+1. Laufende Backend-Prozesse stoppen.
+2. Backend eindeutig neu starten (ein Prozess, ein Port).
+3. Endpunkte erneut prüfen.
+
+Beispiel (Port 5001):
+
+```sh
+cd <pfad-zum-projekt>/Genau_Projekt
+source .venv/bin/activate
+python -c "from backend.app import create_app; app=create_app(); app.run(host='127.0.0.1', port=5001, debug=False)"
+
+curl http://127.0.0.1:5001/health
+curl "http://127.0.0.1:5001/foods?q=apfel&limit=10"
+```
+
+Wenn auf Port 5000 bereits ein anderer Dienst lauscht, nutze einen freien Port (z.B. 5001) und setze im Frontend `BACKEND_URL` entsprechend in `frontend/.env.local`.
+
 ## 5) API-Endpunkte
 
 ### Health Check
@@ -534,7 +569,7 @@ npm run dev
   - `backend/scripts/evaluate_foodplan.py`: bewertet einen (enriched) Plan gegen `rules/dge_lunch_rules.json` und erzeugt einen Dual-Report (`report.dual.json`)
 - `backend/rules/`: Regel- und Mapping-Dateien (JSON)
   - `backend/rules/dge_lunch_rules.json`: Regeln für die DGE-Lunch-Auswertung
-  - `backend/rules/DGE_GRAMM_TODO.md`: Arbeitsstand + TODO-Liste fuer die geplante Gramm-Regelumsetzung
+  - `backend/rules/DGE_GRAMM_TODO.md`: Arbeitsstand + TODO-Liste für die geplante Gramm-Regelumsetzung
   - `backend/rules/bls_to_dge_groups.json`: Mapping/Keywords zur Zuordnung BLS/Begriffe -> DGE-Food-Groups
 - `backend/instance/bls.db`: SQLite Datenbankdatei (wird beim Import erzeugt)
 - `backend/instance/uploads/`: optionaler Ordner (derzeit nicht genutzt) – Uploads werden in-memory verarbeitet und nicht auf Disk gespeichert
