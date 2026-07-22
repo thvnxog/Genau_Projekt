@@ -79,21 +79,8 @@ def main():
             if col not in df.columns:
                 raise KeyError(f"Spalte fehlt in Excel: {col}")
 
-        # mögliche Namen für eine Code/Schlüssel-Spalte in der Excel
-        POSSIBLE_CODE_COLS = [
-            "BLS Code",
-            "BLS_Code",
-            "Schluessel",
-            "Schlüssel",
-            "Schluesselnummer",
-            "ID",
-            "id",
-            "code",
-            "Code",
-            "KEY",
-            "Key",
-        ]
-        code_col = next((c for c in df.columns if c in POSSIBLE_CODE_COLS), None)
+        # Erwartete Code-Spalte in der Excel-Datei.
+        code_col = "BLS Code" if "BLS Code" in df.columns else None
 
         print("Lösche alte Datensätze...")
         Food.query.delete()
