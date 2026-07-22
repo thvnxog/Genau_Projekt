@@ -131,6 +131,18 @@ Wenn die SQLite-Datei nicht unter `backend/instance/bls.db` liegt, kannst du sie
 export BLS_DB_PATH="/pfad/zur/bls.db"
 ```
 
+Wichtig:
+
+- `BLS_DB_PATH` wird in der Enrichment-/Upload-Pipeline genutzt.
+- `import_bls.py` nutzt **nicht** `BLS_DB_PATH`, sondern die App-DB-Konfiguration (`DATABASE_URL`).
+
+Falls du den Zielpfad der SQLite-DB für Import und API explizit setzen willst:
+
+```sh
+export DATABASE_URL="sqlite:////absoluter/pfad/bls.db"
+python backend/import_bls.py
+```
+
 ## 4) Server starten
 
 ```sh
@@ -541,6 +553,20 @@ Du verwendest sehr wahrscheinlich den falschen Python-Interpreter.
 ### Port belegt
 
 Wenn `127.0.0.1:5000` belegt ist, stoppe den Prozess, der den Port nutzt, oder starte das Backend auf einem anderen Port (ggf. Code in `backend/app.py` anpassen).
+
+### `sqlite3.OperationalError: unable to open database file`
+
+Typische Ursachen:
+
+- Der DB-Pfad zeigt auf einen Ordner, der nicht existiert.
+- Es wird ein falscher/unerwarteter `DATABASE_URL` verwendet.
+
+Checkliste:
+
+1. Sicherstellen, dass die venv aktiv ist.
+2. Optional gesetzte Variablen prüfen: `echo $DATABASE_URL` und `echo $BLS_DB_PATH`.
+3. Für Standardbetrieb ohne Sonderpfade `DATABASE_URL` nicht setzen und `python backend/import_bls.py` aus dem Projekt-Root starten.
+4. Wenn `DATABASE_URL` gesetzt wird, immer einen absoluten SQLite-Pfad mit existierendem Parent-Ordner verwenden.
 
 ## `npm run dev` hängt bei "Starting..."
 

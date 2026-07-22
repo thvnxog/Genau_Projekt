@@ -54,6 +54,25 @@ if not logging.getLogger().handlers:
 logger = logging.getLogger(__name__)
 
 
+def ensure_sqlite_parent_dir(db_uri: str) -> None:
+    """Legt bei SQLite-Datei-URIs den Parent-Ordner an.
+
+    Verhindert `unable to open database file`, wenn der Zielordner noch nicht
+    existiert (z. B. bei frischen Setups ohne `backend/instance/`).
+    """
+
+    if not db_uri.startswith("sqlite:///"):
+        return
+
+    raw_path = db_uri[len("sqlite:///") :]
+    if not raw_path or raw_path == ":memory:":
+        return
+
+    db_path = Path(raw_path).expanduser()
+    if db_path.is_absolute():
+        db_path.parent.mkdir(parents=True, exist_ok=True)
+
+
 def normalize_school_level(raw_value) -> str | None:
     """Normalisiert Schulstufe auf `P` oder `S` (oder None)."""
 
@@ -88,6 +107,7 @@ def create_app():
         "DATABASE_URL", f"sqlite:///{default_sqlite_path.as_posix()}"
     )
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+    ensure_sqlite_parent_dir(app.config["SQLALCHEMY_DATABASE_URI"])
 
     def ensure_foods_code_column() -> None:
         """Erweitert ältere SQLite-Schemata um `foods.code`, falls nötig.
