@@ -480,6 +480,7 @@ ADDITIONAL_NOTE_TAG_PATTERNS = {
     "frozen": [r"\btk\b", r"\btiefk[üu]hl\b", r"\btiefkuehl\b"],
     "fresh": [r"\bfrisch\b"],
     "canned": [r"\bkonserve\b", r"\bkonserven\b"],
+    "raw_veg": [r"\brohkost\b", r"\broh\b"],
 }
 
 
