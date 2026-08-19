@@ -10,11 +10,33 @@ import {
   getPrimaryFoodGroup,
   type FoodGroup,
   type PlanDay,
+  type PlanItem,
   type RelevantTag,
 } from '../../lib/foodplan';
 
 // Selbstcheck-UI: Zuordnungen prüfen, korrigieren und erneut auswerten.
 const SELF_CHECK_WARNING_SOURCE_LETTERS = new Set(['X', 'Y']);
+const SELF_CHECK_CONFIDENCE_THRESHOLD = 0.8;
+
+function hasXYSource(item: PlanItem): boolean {
+  const sourceLetters = Array.isArray(item.links?.bls_code_letters)
+    ? item.links.bls_code_letters
+    : [];
+
+  return sourceLetters.some((letter) =>
+    SELF_CHECK_WARNING_SOURCE_LETTERS.has(String(letter).trim().toUpperCase()),
+  );
+}
+
+function hasConfidentSingleGroup(item: PlanItem): boolean {
+  const confidence = item.links?.confidence;
+  return (
+    Boolean(item.links?.food_group) &&
+    (item.food_groups ?? []).length === 1 &&
+    typeof confidence === 'number' &&
+    confidence >= SELF_CHECK_CONFIDENCE_THRESHOLD
+  );
+}
 
 type SelfCheckWeek = {
   week_index: number;
@@ -160,40 +182,23 @@ export function SelfCheckSection({
                     Boolean(it.links?.food_group) ||
                     (it.tags ?? []).includes('not_applicable'),
                 );
-                const itemsWithXYOrigin = recognizedItems.filter((it) => {
-                  const sourceLetters = Array.isArray(
-                    it.links?.bls_code_letters,
-                  )
-                    ? it.links.bls_code_letters
-                    : [];
-                  return sourceLetters.some((letter) =>
-                    SELF_CHECK_WARNING_SOURCE_LETTERS.has(
-                      String(letter).trim().toUpperCase(),
-                    ),
-                  );
-                });
-
                 const openXYReviewCount = recognizedItems.filter(
                   (it, itemIdx) => {
-                    const sourceLetters = Array.isArray(
-                      it.links?.bls_code_letters,
-                    )
-                      ? it.links.bls_code_letters
-                      : [];
                     const itemKey = `${menuKey}-${itemIdx}`;
                     return (
-                      sourceLetters.some((letter) =>
-                        SELF_CHECK_WARNING_SOURCE_LETTERS.has(
-                          String(letter).trim().toUpperCase(),
-                        ),
-                      ) &&
+                      hasXYSource(it) &&
+                      !hasConfidentSingleGroup(it) &&
                       !reviewedSourceItems[itemKey] &&
                       !manuallyAssignedItems[itemKey]
                     );
                   },
                 ).length;
 
-                const hasOpenXYReview = openXYReviewCount > 0;
+                const openXYReviewRate = recognizedItems.length
+                  ? openXYReviewCount / recognizedItems.length
+                  : 0;
+                const hasOpenXYReview =
+                  openXYReviewCount >= 2 && openXYReviewRate > 0.4;
                 const isMenuOpen = openMenus[menuKey] ?? false;
 
                 const recognizedGroups = Array.from(
@@ -228,8 +233,8 @@ export function SelfCheckSection({
                       {hasOpenXYReview && (
                         <span
                           className='ml-2 rounded-full border border-slate-200 bg-white px-2 py-0.5 text-xs font-black text-slate-700'
-                          title={`${openXYReviewCount}/${itemsWithXYOrigin.length} Gerichte mit X/Y-BLS-Code sind noch offen.`}
-                          aria-label={`${openXYReviewCount}/${itemsWithXYOrigin.length} Gerichte mit X/Y-BLS-Code sind noch offen.`}
+                          title={`${openXYReviewCount}/${recognizedItems.length} erkannte Gerichte stammen aus X/Y-BLS-Codes und sind noch offen.`}
+                          aria-label={`${openXYReviewCount}/${recognizedItems.length} erkannte Gerichte stammen aus X/Y-BLS-Codes und sind noch offen.`}
                         >
                           Zur Prüfung empfohlen 👁️
                         </span>
@@ -272,30 +277,19 @@ export function SelfCheckSection({
                           const wasManuallyAssigned = Boolean(
                             manuallyAssignedItems[itemKey],
                           );
-                          const sourceLetters = Array.isArray(
-                            it.links?.bls_code_letters,
-                          )
-                            ? it.links.bls_code_letters
-                            : [];
                           const needsSourceLetterReview =
                             recognizedGroup &&
                             !wasManuallyAssigned &&
-                            sourceLetters.some((letter) =>
-                              SELF_CHECK_WARNING_SOURCE_LETTERS.has(
-                                String(letter).trim().toUpperCase(),
-                              ),
-                            );
+                            hasXYSource(it) &&
+                            !hasConfidentSingleGroup(it);
                           const isSourceItemReviewed = Boolean(
                             reviewedSourceItems[itemKey],
                           );
                           const canMarkAsReviewed =
                             recognizedGroup &&
                             !wasManuallyAssigned &&
-                            sourceLetters.some((letter) =>
-                              SELF_CHECK_WARNING_SOURCE_LETTERS.has(
-                                String(letter).trim().toUpperCase(),
-                              ),
-                            ) &&
+                            hasXYSource(it) &&
+                            !hasConfidentSingleGroup(it) &&
                             !isSourceItemReviewed;
 
                           if (!showGroups) return null;
