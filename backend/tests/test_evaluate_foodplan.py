@@ -1,4 +1,8 @@
-from scripts.evaluate_foodplan import evaluate_plan_for_diet, infer_groups_for_item
+from scripts.evaluate_foodplan import (
+    evaluate_plan_for_diet,
+    infer_groups_for_item,
+    infer_tags_for_item,
+)
 
 
 def build_plan() -> dict:
@@ -59,6 +63,15 @@ def test_infer_groups_for_item_ignores_tags_and_raw_text_without_explicit_groups
     }
 
     assert infer_groups_for_item(item) == []
+
+
+def test_infer_tags_for_item_marks_plain_fruit_as_whole_fruit_but_not_mus():
+    assert infer_tags_for_item(
+        {"raw_text": "Apfel", "tags": []}, ["fruit"]
+    ) == ["whole_fruit"]
+    assert infer_tags_for_item(
+        {"raw_text": "Apfelmus", "tags": []}, ["fruit"]
+    ) == []
 
 
 def test_evaluate_plan_for_diet_counts_groups_and_builds_gram_hints():

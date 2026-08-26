@@ -80,6 +80,7 @@ export type PlanItem = {
     confidence?: number | null;
     bls_code_letter?: string | null;
     bls_code_letters?: string[];
+    bls_matches?: Array<{ code?: string | null }>;
   };
   tags?: string[];
   food_groups?: string[];

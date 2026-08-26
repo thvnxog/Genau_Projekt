@@ -16,26 +16,27 @@ import {
 
 // Selbstcheck-UI: Zuordnungen prüfen, korrigieren und erneut auswerten.
 const SELF_CHECK_WARNING_SOURCE_LETTERS = new Set(['X', 'Y']);
-const SELF_CHECK_CONFIDENCE_THRESHOLD = 0.8;
 
-function hasXYSource(item: PlanItem): boolean {
+function hasXYSourceMajority(item: PlanItem): boolean {
+  const matches = item.links?.bls_matches;
+  if (Array.isArray(matches) && matches.length > 0) {
+    const xyCount = matches.filter((match) =>
+      SELF_CHECK_WARNING_SOURCE_LETTERS.has(
+        String(match.code ?? '').trim().toUpperCase().slice(0, 1),
+      ),
+    ).length;
+    return xyCount > matches.length - xyCount;
+  }
+
   const sourceLetters = Array.isArray(item.links?.bls_code_letters)
     ? item.links.bls_code_letters
     : [];
-
-  return sourceLetters.some((letter) =>
-    SELF_CHECK_WARNING_SOURCE_LETTERS.has(String(letter).trim().toUpperCase()),
-  );
-}
-
-function hasConfidentSingleGroup(item: PlanItem): boolean {
-  const confidence = item.links?.confidence;
-  return (
-    Boolean(item.links?.food_group) &&
-    (item.food_groups ?? []).length === 1 &&
-    typeof confidence === 'number' &&
-    confidence >= SELF_CHECK_CONFIDENCE_THRESHOLD
-  );
+  const xyCount = sourceLetters.filter((letter) =>
+    SELF_CHECK_WARNING_SOURCE_LETTERS.has(
+      String(letter).trim().toUpperCase(),
+    ),
+  ).length;
+  return xyCount > sourceLetters.length - xyCount;
 }
 
 type SelfCheckWeek = {
@@ -186,8 +187,7 @@ export function SelfCheckSection({
                   (it, itemIdx) => {
                     const itemKey = `${menuKey}-${itemIdx}`;
                     return (
-                      hasXYSource(it) &&
-                      !hasConfidentSingleGroup(it) &&
+                      hasXYSourceMajority(it) &&
                       !reviewedSourceItems[itemKey] &&
                       !manuallyAssignedItems[itemKey]
                     );
@@ -280,16 +280,14 @@ export function SelfCheckSection({
                           const needsSourceLetterReview =
                             recognizedGroup &&
                             !wasManuallyAssigned &&
-                            hasXYSource(it) &&
-                            !hasConfidentSingleGroup(it);
+                            hasXYSourceMajority(it);
                           const isSourceItemReviewed = Boolean(
                             reviewedSourceItems[itemKey],
                           );
                           const canMarkAsReviewed =
                             recognizedGroup &&
                             !wasManuallyAssigned &&
-                            hasXYSource(it) &&
-                            !hasConfidentSingleGroup(it) &&
+                            hasXYSourceMajority(it) &&
                             !isSourceItemReviewed;
 
                           if (!showGroups) return null;

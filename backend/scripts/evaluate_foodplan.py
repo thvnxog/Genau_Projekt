@@ -28,6 +28,7 @@ CLI Nutzung (Beispiel):
 
 import argparse
 import json
+import re
 from pathlib import Path
 from typing import Dict, List, Tuple
 
@@ -161,7 +162,7 @@ def collect_counts_and_evidence(plan: dict, selected_diet: str) -> Tuple[
             )
 
         # --- tags zählen --------------------------------------------------------
-        tags = item.get("tags") or []
+        tags = infer_tags_for_item(item, groups_to_count)
         for t in tags:
             tag_counts[t] = tag_counts.get(t, 0) + 1
             evidence_tags.setdefault(t, []).append(
@@ -234,6 +235,7 @@ def as_list(value):
 
     return value if isinstance(value, list) else [value]
 
+
 def infer_groups_for_item(item: dict) -> List[str]:
     """Liefert nur explizit hinterlegte Lebensmittelgruppen eines Gerichts."""
 
@@ -251,6 +253,22 @@ def infer_groups_for_item(item: dict) -> List[str]:
                 groups.append(group.strip())
 
     return list(dict.fromkeys(groups))
+
+
+def infer_tags_for_item(item: dict, groups: List[str]) -> List[str]:
+    """Ergaenzt regelrelevante Tags aus einer eindeutigen Gruppenzuordnung."""
+
+    tags = list(dict.fromkeys(item.get("tags") or []))
+    raw_text = str(item.get("raw_text") or "").strip().lower()
+    processed_fruit_pattern = re.compile(
+        r"(?:mus|saft|nektar|kompott|konfit(?:ue|ü)re|marmelade|smoothie|brei|p(?:u|ü)ree)\b"
+    )
+
+    if "fruit" in groups and raw_text and not processed_fruit_pattern.search(raw_text):
+        if "whole_fruit" not in tags:
+            tags.append("whole_fruit")
+
+    return tags
 
 
 def resolve_threshold(rule: dict, school_level: str | None) -> float:

@@ -109,7 +109,7 @@ test('selfcheck section warns when a recognized item comes from X or Y', () => {
   ).toBeInTheDocument();
 });
 
-test('selfcheck section does not warn for a confident single-group X or Y match', () => {
+test('selfcheck section warns when X or Y codes are the majority of matches', () => {
   render(
     <SelfCheckSection
       draftItemCount={1}
@@ -155,8 +155,59 @@ test('selfcheck section does not warn for a confident single-group X or Y match'
   );
 
   expect(
-    screen.queryByLabelText(/Diese Gruppe stammt aus einem X\/Y-BLS-Code/i),
-  ).not.toBeInTheDocument();
+    screen.getByLabelText(/Diese Gruppe stammt aus einem X\/Y-BLS-Code/i),
+  ).toBeInTheDocument();
+});
+
+test('selfcheck section does not warn when normal codes are the majority of matches', () => {
+  render(
+    <SelfCheckSection
+      draftItemCount={1}
+      selfCheckWeeks={[{ week_index: 0, week_label: 'Woche 1' }]}
+      missingFoodGroupByWeek={new Map([[0, 0]])}
+      normalizedSelfCheckWeekIndex={0}
+      setSelfCheckWeekIndex={vi.fn()}
+      selfCheckDays={[
+        {
+          day: {
+            weekday: 'Donnerstag',
+            week_index: 0,
+            week_label: 'Woche 1',
+            menus: [
+              {
+                menu_type: 'mischkost',
+                items: [
+                  {
+                    raw_text: 'Apfelmus',
+                    links: {
+                      food_group: 'vegetables',
+                      confidence: 0.2,
+                      bls_matches: [
+                        { code: 'F921900' },
+                        { code: 'F928900' },
+                        { code: 'X9A2030' },
+                      ],
+                    },
+                    food_groups: ['vegetables'],
+                    tags: [] as string[],
+                  },
+                ],
+              },
+            ],
+          },
+          dayIdx: 0,
+        },
+      ]}
+      openMenus={{ '0-0': true }}
+      setOpenMenus={vi.fn()}
+      toggleItemFoodGroup={vi.fn()}
+      toggleItemTag={vi.fn()}
+      loading={false}
+      onBackToReport={vi.fn()}
+      onAnalyze={vi.fn()}
+    />,
+  );
+
   expect(screen.queryByText(/Bitte prüfen/i)).not.toBeInTheDocument();
 });
 
